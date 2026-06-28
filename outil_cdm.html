@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coupe du Monde 2026 — Prédiction tirs & tirs cadrés (avec xG)</title>
+<style>
+  :root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#28384b;--txt:#e8eef5;--muted:#9fb0c3;
+    --accent:#27d49a;--accent2:#3b9bff;--warn:#ffb454;--bad:#ff6b6b;--good:#27d49a;--xg:#c08bff}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(160deg,#0e1620,#0f1d2b);color:var(--txt);line-height:1.5;padding:0 0 60px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+  header{padding:26px 0 10px}
+  h1{font-size:24px;margin:0 0 4px}
+  h1 .em{color:var(--accent)}
+  .sub{color:var(--muted);font-size:14px;margin:0}
+  .banner{background:rgba(59,155,255,.1);border:1px solid #29486b;color:#bcd6f5;border-radius:10px;padding:9px 13px;font-size:12.5px;margin:14px 0 6px}
+  .err{background:rgba(255,107,107,.12);border:1px solid #6b2a2a;color:#ffd2d2;border-radius:10px;padding:14px 16px;font-size:14px}
+  .tabs{display:flex;gap:6px;margin:18px 0 16px;flex-wrap:wrap}
+  .tab{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 16px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+  .tab:hover{color:var(--txt)}
+  .tab.active{background:var(--accent);color:#06281f;border-color:var(--accent)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  label{display:block;font-size:12px;color:var(--muted);margin:0 0 5px;text-transform:uppercase;letter-spacing:.4px}
+  select,input[type=date]{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:10px 12px;border-radius:9px;font-size:15px;width:100%}
+  .field{flex:1;min-width:160px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer;color:var(--muted);user-select:none}
+  .chip.on{background:rgba(39,212,154,.16);border-color:var(--accent);color:var(--accent)}
+  .btn{background:var(--accent);color:#06281f;border:none;padding:12px 22px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}
+  .btn:hover{filter:brightness(1.06)}
+  .btn.sm{padding:6px 13px;font-size:13px;margin:0}
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:2px 0 6px}
+  @media(max-width:620px){.duo{grid-template-columns:1fr}}
+  .teamcard{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:15px 17px;cursor:pointer;position:relative}
+  .teamcard:hover{border-color:#3a5170}
+  .teamcard.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .teamcard .nm{font-size:18px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+  .teamcard .nm .loc{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase}
+  .teamcard .vals{display:flex;gap:16px}
+  .teamcard .v .n{font-size:28px;font-weight:800;color:var(--accent);line-height:1}
+  .teamcard .v .n.s{color:var(--accent2)} .teamcard .v .n.x{color:var(--xg);font-size:22px}
+  .teamcard .v .l{font-size:11px;color:var(--muted)}
+  .teamcard .seeMore{position:absolute;top:13px;right:15px;font-size:11px;color:var(--muted)}
+  .teamcard.active .seeMore{color:var(--accent)}
+  .reco{display:flex;align-items:center;gap:12px;background:rgba(39,212,154,.08);border:1px solid #1f6b53;border-radius:11px;padding:12px 15px;margin:6px 0}
+  .reco.under{background:rgba(255,180,84,.08);border-color:#7a5a2a}
+  .reco .side{font-size:20px;font-weight:800;color:var(--accent)}
+  .reco.under .side{color:var(--warn)}
+  .reco .meta{font-size:13px;color:var(--muted)} .reco .meta b{color:var(--txt)}
+  .reco .pill{margin-left:auto;font-size:13px;font-weight:800;background:rgba(255,255,255,.05);padding:6px 12px;border-radius:9px}
+  .conf{display:flex;align-items:center;gap:12px;margin:10px 0 8px}
+  .gauge{flex:1;height:12px;background:var(--panel2);border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .gauge > i{display:block;height:100%;background:linear-gradient(90deg,#3b9bff,#27d49a)}
+  .secTitle{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;font-weight:700}
+  .compNote{font-size:12.5px;color:#cfe0f2;background:rgba(59,155,255,.07);border-left:3px solid var(--accent2);padding:8px 11px;border-radius:0 8px 8px 0;margin:4px 0}
+  .histb{background:rgba(255,180,84,.10);border:1px solid #7a5a2a;color:#ffe6c2;border-radius:11px;padding:11px 14px;margin:2px 0 12px;font-size:13.5px}
+  .media{background:rgba(123,97,255,.06);border:1px solid #3b3470;border-radius:12px;padding:14px 16px;margin:2px 0 14px}
+  .media h4{margin:0 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#c5b9ff}
+  .media .dis{font-size:11.5px;color:var(--muted);margin-bottom:8px}
+  .mItem{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid #2c2a4a}
+  .mItem:first-of-type{border-top:none}
+  .src{font-size:11.5px;font-weight:700;color:#d6ccff;white-space:nowrap;display:flex;align-items:center;gap:4px;min-width:120px}
+  .src .ck{display:inline-block;width:14px;height:14px;border-radius:50%;background:#3b9bff;color:#fff;font-size:9px;text-align:center;line-height:14px}
+  .mTxt{font-size:13px;flex:1}
+  .mTag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:9px;background:rgba(255,255,255,.06);color:var(--muted);white-space:nowrap}
+  .mTag.alerte{background:rgba(255,107,107,.16);color:var(--bad)}
+  .mUsed{font-size:12px;color:var(--accent);margin-top:8px}
+  .prob{margin:8px 0}
+  .prob .top{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+  .prob .bar{height:14px;background:var(--panel2);border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .prob .bar > i{display:block;height:100%;background:linear-gradient(90deg,#2c7,#27d49a)}
+  .prob.sot .bar > i{background:linear-gradient(90deg,#3b9bff,#6cc4ff)}
+  .pct{font-variant-numeric:tabular-nums;font-weight:700}
+  ul.reasons{list-style:none;padding:0;margin:6px 0}
+  ul.reasons li{padding:8px 10px;border-left:3px solid var(--accent);background:var(--panel2);border-radius:0 8px 8px 0;margin-bottom:7px;font-size:14px}
+  ul.reasons li .w{float:right;font-size:11px;color:var(--muted);background:rgba(255,255,255,.04);padding:2px 7px;border-radius:10px;margin-left:8px}
+  ul.reasons li.neg{border-left-color:var(--warn)} ul.reasons li.xg{border-left-color:var(--xg)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.click{cursor:pointer} tr.click:hover td{background:rgba(39,212,154,.06)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:9px;font-size:11.5px;font-weight:700}
+  .tag.ok{background:rgba(39,212,154,.16);color:var(--good)} .tag.ko{background:rgba(255,107,107,.16);color:var(--bad)}
+  .tag.wait{background:rgba(159,176,195,.14);color:var(--muted)}
+  .tag.ov{background:rgba(39,212,154,.16);color:var(--good)} .tag.un{background:rgba(255,180,84,.16);color:var(--warn)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:4px 0 14px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:14px}
+  .card .v{font-size:28px;font-weight:800} .card .k{font-size:12px;color:var(--muted)}
+  .card.g .v{color:var(--good)} .card.b .v{color:var(--accent2)} .card.w .v{color:var(--warn)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(102px,1fr));gap:9px;margin-top:6px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .stat .k{font-size:11px;color:var(--muted)} .stat .v{font-size:17px;font-weight:700}
+  .stat.xg .v{color:var(--xg)}
+  .muted{color:var(--muted)} .small{font-size:12.5px}
+  .reg{font-size:12.5px;padding:3px 9px;border-radius:9px;font-weight:700;display:inline-block}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:46px;margin-top:6px}
+  .bars > i{flex:1;background:var(--accent);border-radius:2px 2px 0 0;opacity:.85}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
+  optgroup{color:var(--muted)} option{color:var(--txt)} .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Coupe du Monde — <span class="em">tirs</span>, <span class="em">tirs cadrés</span> & <span style="color:#c08bff">xG</span></h1>
+    <p class="sub">Données réelles via API-Football · le moteur raisonne avec la qualité des occasions (xG)</p>
+    <div class="banner" id="dataInfo">Chargement des données…</div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="analyse">Analyse d'un match</div>
+    <div class="tab" data-tab="avenir">Matchs à venir</div>
+    <div class="tab" data-tab="suivi">Suivi &amp; taux de réussite</div>
+  </div>
+
+  <section id="analyse">
+    <div class="panel">
+      <p class="small muted" style="margin-top:0">Choisissez un match, ou allez dans « Matchs à venir » et cliquez un match : tout le contexte se charge.</p>
+      <div class="row">
+        <div class="field"><label>Équipe à domicile</label><select id="home"></select></div>
+        <div class="field"><label>Équipe à l'extérieur</label><select id="away"></select></div>
+        <div class="field"><label>Compétition</label><select id="comp"></select></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <div class="field"><label>Météo</label><div class="chips" id="meteo">
+          <div class="chip on" data-v="normal">Normale</div><div class="chip" data-v="pluie">Pluie</div>
+          <div class="chip" data-v="chaleur">Forte chaleur</div><div class="chip" data-v="vent">Vent</div></div></div>
+        <div class="field"><label>Repos avant le match</label><div class="chips" id="repos">
+          <div class="chip" data-v="court">≤ 3 jours</div><div class="chip on" data-v="normal">4–5 jours</div>
+          <div class="chip" data-v="long">≥ 6 jours</div></div></div>
+        <div class="field"><label>Effectif (équipe analysée)</label><div class="chips" id="effectif">
+          <div class="chip on" data-v="complet">Au complet</div><div class="chip" data-v="buteur">Buteur clé absent</div>
+          <div class="chip" data-v="ailier">Ailier créateur de retour</div></div></div>
+      </div>
+      <button class="btn" id="go">Analyser le match</button>
+    </div>
+    <div class="panel" id="result"></div>
+  </section>
+
+  <section id="avenir" class="hidden">
+    <div class="panel">
+      <div class="secTitle">Prochains matchs — cliquez pour analyser</div>
+      <table id="upcoming"><thead><tr>
+        <th>Date</th><th>Match</th><th class="num">Estim.</th><th>Conseil</th><th class="num">Proba</th><th></th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section id="suivi" class="hidden">
+    <div class="panel">
+      <div class="secTitle">Fiabilité sur les matchs déjà joués (backtest)</div>
+      <p class="small muted">Prédiction d'avant-match honnête : la perf du match a été retirée des moyennes avant de prédire.</p>
+      <div class="row" style="align-items:flex-end">
+        <div class="field" style="max-width:190px"><label>Du</label><input type="date" id="d1"></div>
+        <div class="field" style="max-width:190px"><label>Au</label><input type="date" id="d2"></div>
+        <div class="field" style="max-width:220px"><label>Marché</label>
+          <select id="market"><option value="all">Tous</option><option value="tirs">Tirs</option><option value="cadres">Tirs cadrés</option></select></div>
+      </div>
+      <div class="cards" id="scoreCards" style="margin-top:16px"></div>
+      <table id="backtest"><thead><tr>
+        <th>Date</th><th>Match</th><th>Conseil IA</th><th class="num">Estim.</th><th class="num">Réel</th><th>Intervalle</th><th>Pari</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <footer>Outil de prédiction · données API-Football (Coupe du Monde, avec xG) · relancez collecteur_cdm.py pour mettre à jour</footer>
+</div>
+
+<script src="donnees_cdm.js"></script>
+<script>
+var C = {
+  wc:{label:"Coupe du Monde 2026",mult:1.02,note:"Phase finale (groupes puis élimination directe). On se fie aux matchs récents du tournoi contre des adversaires de niveau équivalent, pas aux éditions anciennes."},
+  amN:{label:"Match amical (sélection)",mult:0.92,note:"Intensité réduite, test tactique."}
+};
+var CATALOG = {nation_uefa:["wc","amN"],nation_conmebol:["wc","amN"],nation_caf:["wc","amN"],
+  nation_concacaf:["wc","amN"],nation_afc:["wc","amN"]};
+if(typeof LEAGUE_AVG==="undefined") var LEAGUE_AVG=12.8;
+var XG_REF=0.11;
+
+function mean(a){return a.reduce(function(s,x){return s+x;},0)/a.length;}
+function median(a){var b=a.slice().sort(function(x,y){return x-y;});var m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2;}
+function variance(a){var m=mean(a);return mean(a.map(function(x){return (x-m)*(x-m);}));}
+function std(a){return Math.sqrt(variance(a));}
+function erf(x){var t=1/(1+0.3275911*Math.abs(x));var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
+function normCdf(x,mu,sd){return 0.5*(1+erf((x-mu)/(sd*Math.SQRT2)));}
+function r1(x){return Math.round(x*10)/10;}
+function r2(x){return Math.round(x*100)/100;}
+function fr(x){return String(x).replace(".",",");}
+function clean(a){return (a||[]).filter(function(x){return x!=null;});}
+
+function reco(mu,sd){
+  var best=null;
+  for(var L=Math.floor(mu-3)+0.5; L<=mu+3; L+=1){
+    var pOver=1-normCdf(L,mu,sd), conf=Math.max(pOver,1-pOver);
+    if(conf>0.85) continue;
+    var score=conf-Math.abs(L-mu)*0.01;
+    if(!best||score>best.score) best={line:L,side:pOver>=0.5?"over":"under",prob:Math.round(conf*100),score:score};
+  }
+  if(!best){var L2=Math.round(mu-0.5)+0.5,pO=1-normCdf(L2,mu,sd);best={line:L2,side:pO>=0.5?"over":"under",prob:Math.round(Math.max(pO,1-pO)*100)};}
+  return best;
+}
+
+function predict(focusName, oppName, isHome, compKey, ctx){
+  var f=TEAMS[focusName], o=TEAMS[oppName];
+  var form5=mean(f.sf.slice(0,5)), form10=mean(f.sf);
+  var attack=0.6*form5+0.4*form10;
+  var oppConceded=o.cd.length?mean(o.cd):LEAGUE_AVG;
+  var defFactor=oppConceded/LEAGUE_AVG, defAdj=0.5+0.5*defFactor;
+  var exp=attack*defAdj, base=exp, afterDef=exp;
+  var homeMult=isHome?1.12:0.96, compMult=(C[compKey]||{mult:1}).mult;
+  var wMult={normal:1.0,pluie:0.97,chaleur:0.95,vent:0.98}[ctx.meteo];
+  var rMult={court:0.95,normal:1.0,long:1.02}[ctx.repos];
+  var eMult=ctx.effectif==="buteur"?0.90:(ctx.effectif==="ailier"?1.05:1.0);
+  exp=exp*homeMult; var cHome=exp-afterDef;
+  exp=exp*compMult; var cComp=exp-afterDef-cHome;
+  exp=exp*rMult*wMult*eMult; var cOther=exp-afterDef-cHome-cComp;
+
+  // ---- xG : qualite des occasions -> influence les tirs cadres ----
+  var xgArr=clean(f.xgf), oppXgaArr=clean(o.xga);
+  var hasXg=xgArr.length>=2;
+  var xgMean=hasXg?mean(xgArr):0;
+  var xgPerShot=(hasXg&&form10)?xgMean/form10:0;
+  var quality=hasXg?Math.max(0.85,Math.min(1.20, xgPerShot/XG_REF)):1;
+  var oppXgaMean=oppXgaArr.length?mean(oppXgaArr):0;
+
+  var sotRatio=f.sot.length?mean(f.sot)/mean(f.sf):0.35;
+  var oppSotPress=0.96+0.08*(oppConceded/LEAGUE_AVG);
+  var expSot=exp*sotRatio*oppSotPress*quality*(ctx.effectif==="buteur"?0.86:1)*(ctx.effectif==="ailier"?1.04:1);
+
+  var sd=Math.max(std(f.sf),1.7), cv=sd/(form10||1), sdSot=Math.max(std(f.sot)*0.9,1.0);
+  var conf=92-cv*170;
+  if(compKey==="amN") conf-=5;
+  if(ctx.effectif==="buteur") conf-=6;
+  if(ctx.meteo!=="normal") conf-=2;
+  if(hasXg) conf+=2; // un peu plus sur quand on a la qualite des occasions
+  conf=Math.max(54,Math.min(92,Math.round(conf)));
+
+  var intv=[Math.round(exp-0.85*sd),Math.round(exp+0.85*sd)];
+  var intvSot=[Math.round(expSot-0.85*sdSot),Math.round(expSot+0.85*sdSot)];
+  function pOver(thr,mu,s){return Math.round((1-normCdf(thr,mu,s))*100);}
+  return {
+    exp:r1(exp), expSot:r1(expSot), intv:intv, intvSot:intvSot, conf:conf,
+    form5:r1(form5), form10:r1(form10), oppConceded:r1(oppConceded),
+    hasXg:hasXg, xgMean:r2(xgMean), xgPerShot:r2(xgPerShot), quality:r2(quality), oppXgaMean:r2(oppXgaMean),
+    sd:r1(sd), cv:cv, median:median(f.sf), variance:r1(variance(f.sf)), seasonAvg:r1(mean(f.sf)),
+    decomp:{base:r1(base), def:r1(afterDef-base), home:r1(cHome), comp:r1(cComp), other:r1(cOther)},
+    defFactor:defFactor, recoShots:reco(exp,sd), recoSot:reco(expSot,sdSot),
+    probsShots:[[13.5,pOver(13.5,exp,sd)],[15.5,pOver(15.5,exp,sd)],[17.5,pOver(17.5,exp,sd)]],
+    probsSot:[[4.5,pOver(4.5,expSot,sdSot)],[5.5,pOver(5.5,expSot,sdSot)],[6.5,pOver(6.5,expSot,sdSot)]],
+    f:f, o:o, focusName:focusName, oppName:oppName, isHome:isHome, compKey:compKey
+  };
+}
+
+var STATE={comp:null,active:0,R:[null,null],ctx:null,media:"manual",matchName:"",hist:null};
+function $(id){return document.getElementById(id);}
+
+function recoHTML(rc,unit){
+  var over=rc.side==="over", act=over?("Prendre le +"+fr(rc.line)):("Prendre le -"+fr(rc.line));
+  return '<div class="reco '+(over?"":"under")+'"><div class="side">'+(over?"OVER":"UNDER")+' '+fr(rc.line)+'</div>'+
+    '<div class="meta">'+unit+'<br><b>'+act+'</b></div><div class="pill">'+rc.prob+'%</div></div>';
+}
+function renderMedia(){
+  if(STATE.media==="manual") return '<div class="media"><h4>Veille médias &amp; réseaux</h4><div class="dis">Analyse manuelle. Ouvrez un match depuis « Matchs à venir » pour voir la veille associée. Branchez un flux de comptes certifiés pour compos et blessures en direct.</div></div>';
+  if(!STATE.media||!STATE.media.length) return "";
+  var items=STATE.media.map(function(m){return '<div class="mItem"><div class="src">'+(m.v?'<span class="ck">✓</span>':"")+m.src+'</div><div class="mTxt">'+m.txt+'</div><div class="mTag '+(m.tag==="Alerte"?"alerte":"")+'">'+m.tag+'</div></div>';}).join("");
+  var used=STATE.media.filter(function(m){return m.impact;}).map(function(m){return m.impact;});
+  var usedTxt=used.length?'<div class="mUsed">Signaux intégrés : '+used.join(" · ")+'.</div>':"";
+  return '<div class="media"><h4>Veille médias &amp; réseaux — '+STATE.matchName+'</h4><div class="dis">Source : '+((STATE.media[0]&&STATE.media[0].src)||"flux")+'.</div>'+items+usedTxt+'</div>';
+}
+function renderHeadline(){
+  var Rh=STATE.R[0], Ra=STATE.R[1];
+  function card(R,idx,loc){
+    var xgCell=R.hasXg?'<div class="v"><div class="n x">'+R.xgMean+'</div><div class="l">xG</div></div>':'';
+    return '<div class="teamcard '+(STATE.active===idx?"active":"")+'" data-idx="'+idx+'"><div class="seeMore">'+(STATE.active===idx?"analysé":"voir le détail")+'</div>'+
+      '<div class="nm">'+R.focusName+' <span class="loc">'+loc+'</span></div><div class="vals">'+
+      '<div class="v"><div class="n">'+R.exp+'</div><div class="l">tirs</div></div>'+
+      '<div class="v"><div class="n s">'+R.expSot+'</div><div class="l">cadrés</div></div>'+xgCell+'</div></div>';
+  }
+  return '<div class="secTitle" style="margin-top:0">Comparatif — cliquez une équipe pour le détail</div><div class="duo">'+card(Rh,0,"domicile")+card(Ra,1,"extérieur")+'</div>';
+}
+function renderDetail(){
+  var R=STATE.R[STATE.active], ctx=STATE.ctx, comp=C[STATE.comp]||{label:"",note:""};
+  var trend=R.form5>R.form10+0.4?"en hausse":(R.form5<R.form10-0.4?"en baisse":"stable");
+  var defWord=R.defFactor<0.78?"forte (étouffe les tirs)":(R.defFactor<0.95?"correcte":"perméable");
+  var reg=R.cv<0.13?["Très régulière","var(--good)"]:(R.cv<0.20?["Régulière","var(--accent2)"]:["Irrégulière","var(--warn)"]);
+  var reasons=[];
+  reasons.push([R.focusName+" tire en moyenne <b>"+R.form10+"</b> fois/match, <b>"+R.form5+"</b> sur les 5 derniers — forme "+trend+".","Forme 30%",false]);
+  reasons.push([R.oppName+" concède <b>"+R.oppConceded+"</b> tirs/match — défense "+defWord+".","Défense adverse 20%",R.defFactor<0.85]);
+  if(R.hasXg){
+    var ql=R.quality>1.03?"plus dangereuses (relève les tirs cadrés)":(R.quality<0.97?"moins dangereuses (baisse les cadrés)":"dans la norme");
+    reasons.push(["Qualité des occasions : <b>"+R.xgMean+"</b> xG/match ("+R.xgPerShot+" par tir) → chances "+ql+".","xG (qualité)",R.quality<0.97]);
+  }
+  reasons.push(["Volume offensif "+(R.form10>=15?"élevé":"moyen")+" ("+R.seasonAvg+" de moyenne).","Force offensive 25%",false]);
+  reasons.push([R.isHome?(R.focusName+" est « équipe à domicile » : +12% de volume."):(R.focusName+" est « équipe à l'extérieur » : léger malus."),"Domicile 10%",!R.isHome]);
+  reasons.push(["Compétition : <b>"+comp.label+"</b>.","Contexte 10%",false]);
+  if(STATE.active===0){
+    if(ctx.effectif==="buteur") reasons.push(["Buteur clé <b>absent</b> (veille médias) : moins de tirs cadrés.","Joueurs",true]);
+    if(ctx.effectif==="ailier") reasons.push(["Ailier créateur <b>de retour</b> (veille médias) : plus de situations de tir.","Joueurs",false]);
+  }
+  if(ctx.meteo!=="normal") reasons.push(["Conditions : "+({pluie:"pluie",chaleur:"forte chaleur",vent:"vent"})[ctx.meteo]+" — léger frein.","Météo 5%",true]);
+  if(ctx.repos==="court") reasons.push(["Repos court (≤3j) : fatigue, volume réduit.","Fatigue",true]);
+  function probBar(arr,cls){return arr.map(function(p){return '<div class="prob '+cls+'"><div class="top"><span>Plus de '+fr(p[0])+'</span><span class="pct">'+p[1]+'%</span></div><div class="bar"><i style="width:'+p[1]+'%"></i></div></div>';}).join("");}
+  var d=R.decomp;
+  function dRow(lbl,val,col){return '<tr><td>'+lbl+'</td><td class="num" style="color:'+col+'">'+(val>0?"+":"")+val+'</td></tr>';}
+  var reasonsHtml=reasons.map(function(x){var cls=x[1]==="xG (qualité)"?"xg":(x[2]?"neg":"");return '<li class="'+cls+'"><span class="w">'+x[1]+'</span>'+x[0]+'</li>';}).join("");
+  var barsHtml=R.f.sf.map(function(v){return '<i style="height:'+Math.round(v/20*100)+'%"></i>';}).join("");
+  var xgStats=R.hasXg?'<div class="stat xg"><div class="k">xG / match</div><div class="v">'+R.xgMean+'</div></div><div class="stat xg"><div class="k">xG / tir</div><div class="v">'+R.xgPerShot+'</div></div>':'';
+  var advXg=R.oppXgaMean?(' · '+R.oppXgaMean+' xGA concédé'):'';
+  return ''+
+    '<div class="secTitle">Recommandation — '+R.focusName+'</div>'+
+    recoHTML(R.recoShots,"Tirs · estimation "+R.exp)+recoHTML(R.recoSot,"Tirs cadrés · estimation "+R.expSot)+
+    '<div class="compNote">'+comp.note+'</div>'+
+    '<div class="conf"><span class="small muted" style="min-width:90px">Confiance '+R.conf+'%</span><div class="gauge"><i style="width:'+R.conf+'%"></i></div></div>'+
+    '<div class="secTitle">Probabilités — tirs</div>'+probBar(R.probsShots,"")+
+    '<div class="secTitle">Probabilités — tirs cadrés</div>'+probBar(R.probsSot,"sot")+
+    '<div class="secTitle">Pourquoi ? Le raisonnement pondéré</div><ul class="reasons">'+reasonsHtml+'</ul>'+
+    '<div class="row"><div class="field"><div class="secTitle">Construction de l’estimation</div><table>'+
+      dRow("Base (forme offensive)",d.base,"var(--txt)")+
+      dRow("Ajustement défense adverse",d.def,d.def<0?"var(--warn)":"var(--good)")+
+      dRow(R.isHome?"Avantage domicile":"Malus extérieur",d.home,d.home<0?"var(--warn)":"var(--good)")+
+      dRow("Compétition",d.comp,d.comp<0?"var(--warn)":"var(--good)")+
+      dRow("Météo · fatigue · effectif",d.other,d.other<0?"var(--warn)":"var(--good)")+
+      '<tr><th>Estimation finale (tirs)</th><th class="num" style="color:var(--accent)">'+R.exp+'</th></tr></table></div>'+
+      '<div class="field"><div class="secTitle">Statistiques calculées</div><div class="stats">'+
+        '<div class="stat"><div class="k">Moy. 5 m.</div><div class="v">'+R.form5+'</div></div>'+
+        '<div class="stat"><div class="k">Moy. tournoi</div><div class="v">'+R.form10+'</div></div>'+
+        '<div class="stat"><div class="k">Médiane</div><div class="v">'+R.median+'</div></div>'+
+        '<div class="stat"><div class="k">Écart-type</div><div class="v">'+R.sd+'</div></div>'+xgStats+'</div>'+
+        '<div style="margin-top:10px">Régularité : <span class="reg" style="background:rgba(255,255,255,.05);color:'+reg[1]+'">'+reg[0]+'</span></div>'+
+        '<div class="bars" title="derniers matchs (tirs)">'+barsHtml+'</div>'+
+        '<div class="small muted" style="margin-top:4px">Adversaire : '+R.oppConceded+' tirs concédés'+advXg+'.</div>'+
+      '</div></div>';
+}
+function draw(){
+  var hb=STATE.hist?'<div class="histb">Match déjà joué — '+STATE.hist.match+' · Conseil avant-match : <b>'+STATE.hist.lbl+'</b> · Estimation : <b>'+STATE.hist.pred+'</b> tirs · Résultat réel : <b>'+STATE.hist.real+'</b> tirs.</div>':'';
+  $("result").innerHTML=hb+renderMedia()+renderHeadline()+renderDetail();
+  document.querySelectorAll(".teamcard").forEach(function(c){c.addEventListener("click",function(){STATE.active=+c.dataset.idx; draw();});});
+}
+function chipGroups(){document.querySelectorAll(".chips").forEach(function(g){g.addEventListener("click",function(e){if(!e.target.classList.contains("chip"))return;g.querySelectorAll(".chip").forEach(function(c){c.classList.remove("on");});e.target.classList.add("on");});});}
+function setChip(group,val){document.querySelectorAll("#"+group+" .chip").forEach(function(c){if(c.dataset.v===val)c.classList.add("on");else c.classList.remove("on");});}
+function getCtx(){return {meteo:document.querySelector("#meteo .chip.on").dataset.v,repos:document.querySelector("#repos .chip.on").dataset.v,effectif:document.querySelector("#effectif .chip.on").dataset.v};}
+function teamOptions(){var names=Object.keys(TEAMS).sort();return '<optgroup label="Équipes">'+names.map(function(n){return '<option>'+n+'</option>';}).join("")+'</optgroup>';}
+function fillComp(){var cat=TEAMS[$("home").value].cat;var list=CATALOG[cat]||["wc","amN"];$("comp").innerHTML=list.map(function(k){return '<option value="'+k+'">'+C[k].label+'</option>';}).join("");}
+function syncAway(){$("away").innerHTML=teamOptions();if($("away").value===$("home").value){var opts=[].slice.call($("away").options).map(function(o){return o.value;}).filter(function(v){return v!==$("home").value;});if(opts.length)$("away").value=opts[0];}}
+function fillSelects(){var names=Object.keys(TEAMS).sort();$("home").innerHTML=teamOptions();$("home").value=names[0];syncAway();$("away").value=names[1]||names[0];fillComp();$("home").onchange=function(){syncAway();fillComp();};}
+function runAnalyse(){if($("home").value===$("away").value)return;STATE.comp=$("comp").value;STATE.ctx=getCtx();
+  STATE.R=[predict($("home").value,$("away").value,true,$("comp").value,STATE.ctx),
+           predict($("away").value,$("home").value,false,$("comp").value,{meteo:STATE.ctx.meteo,repos:STATE.ctx.repos,effectif:"complet"})];
+  STATE.active=0; draw();}
+
+function fmtDate(s){var p=s.split("-");return p[2]+"/"+p[1];}
+function fillUpcoming(){
+  document.querySelector("#upcoming tbody").innerHTML=UPCOMING.map(function(u,i){
+    if(!TEAMS[u.home]||!TEAMS[u.away]) return "";
+    var R=predict(u.home,u.away,true,u.comp,u.ctx);
+    var isSot=u.market==="cadres", est=isSot?R.expSot:R.exp, rc=isSot?R.recoSot:R.recoShots, over=rc.side==="over";
+    return '<tr class="click" data-i="'+i+'"><td>'+fmtDate(u.date)+'</td><td>'+u.home+' – '+u.away+'</td>'+
+      '<td class="num"><b>'+est+'</b></td><td><span class="tag '+(over?"ov":"un")+'">'+(over?"OVER":"UNDER")+' '+fr(rc.line)+'</span> <span class="small muted">'+u.home+'</span></td>'+
+      '<td class="num">'+rc.prob+'%</td><td><button class="btn sm" data-i="'+i+'">Analyser</button></td></tr>';
+  }).join("");
+  document.querySelectorAll("#upcoming tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadFixture(+tr.dataset.i);});});
+}
+function loadFixture(i){var u=UPCOMING[i];$("home").value=u.home;syncAway();fillComp();$("away").value=u.away;$("comp").value=u.comp;
+  setChip("meteo",u.ctx.meteo);setChip("repos",u.ctx.repos);setChip("effectif",u.ctx.effectif);
+  STATE.media=u.media;STATE.matchName=u.home+" – "+u.away;STATE.hist=null;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
+
+function inIntv(real,iv){return real>=iv[0]&&real<=iv[1];}
+function loadHistory(h,a,real,pred,lbl){
+  if(!TEAMS[h]||!TEAMS[a])return;
+  $("home").value=h; syncAway(); fillComp(); $("away").value=a;
+  setChip("meteo","normal"); setChip("repos","normal"); setChip("effectif","complet");
+  STATE.media="manual"; STATE.hist={match:h+" – "+a, real:real, pred:pred, lbl:lbl};
+  selectTab("analyse"); runAnalyse(); window.scrollTo(0,0);
+}
+function parseReco(lbl){var p=lbl.split(" ");return {over:p[0]==="OVER",thr:parseFloat(p[1].replace(",","."))};}
+function renderBacktest(){
+  var d1=$("d1").value,d2=$("d2").value,mk=$("market").value;
+  var rows=HISTORY.filter(function(r){return (!d1||r[0]>=d1)&&(!d2||r[0]<=d2)&&(mk==="all"||r[2]===mk);});
+  var betCount=0,inCount=0,errSum=0;
+  document.querySelector("#backtest tbody").innerHTML=rows.map(function(r){
+    var date=r[0],match=r[1],lbl=r[3],pred=r[4],iv=r[5],real=r[6];
+    var pr=parseReco(lbl);var actualOver=real>pr.thr,betOk=pr.over===actualOver;if(betOk)betCount++;
+    var ok=inIntv(real,iv);if(ok)inCount++;errSum+=Math.abs(real-pred);
+    var pp=match.split(" - "), clk=(pp.length===2&&TEAMS[pp[0]]&&TEAMS[pp[1]]);
+    return '<tr class="'+(clk?"click":"")+'" data-h="'+(pp[0]||"")+'" data-a="'+(pp[1]||"")+'" data-real="'+real+'" data-pred="'+pred+'" data-lbl="'+lbl+'"><td>'+fmtDate(date)+'</td><td>'+match+(clk?' <span class="small muted">▸</span>':'')+'</td><td><span class="tag '+(pr.over?"ov":"un")+'">'+lbl+'</span></td>'+
+      '<td class="num"><b>'+pred+'</b></td><td class="num">'+real+'</td>'+
+      '<td class="num small">'+iv[0]+'–'+iv[1]+' '+(ok?'<span class="tag ok">in</span>':'<span class="tag ko">out</span>')+'</td>'+
+      '<td><span class="tag '+(betOk?"ok":"ko")+'">'+(betOk?"gagné":"perdu")+'</span></td></tr>';
+  }).join("") || '<tr><td colspan="7" class="muted" style="text-align:center;padding:20px">Aucun match sur cette période.</td></tr>';
+  document.querySelectorAll("#backtest tr.click").forEach(function(tr){
+    tr.addEventListener("click",function(){loadHistory(tr.dataset.h,tr.dataset.a,tr.dataset.real,tr.dataset.pred,tr.dataset.lbl);});
+  });
+  var n=rows.length||1;
+  $("scoreCards").innerHTML=
+    '<div class="card g"><div class="v">'+(rows.length?Math.round(betCount/n*100)+"%":"—")+'</div><div class="k">Paris (Over/Under) corrects</div></div>'+
+    '<div class="card b"><div class="v">'+(rows.length?Math.round(inCount/n*100)+"%":"—")+'</div><div class="k">Réel dans l’intervalle</div></div>'+
+    '<div class="card w"><div class="v">'+(rows.length?(errSum/n).toFixed(1):"—")+'</div><div class="k">Erreur moyenne (tirs)</div></div>'+
+    '<div class="card"><div class="v">'+rows.length+'</div><div class="k">Matchs analysés</div></div>';
+}
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(x){x.classList.toggle("active",x.dataset.tab===name);});["analyse","avenir","suivi"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+function initTabs(){document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});}
+window.addEventListener("DOMContentLoaded",function(){
+  if(typeof TEAMS==="undefined" || !Object.keys(TEAMS).length){
+    $("dataInfo").className="err";
+    $("dataInfo").innerHTML="Aucune donnée. Lancez d'abord <b>collecteur_cdm.py</b> (ou <b>python collecteur_cdm.py --demo</b>) pour générer <b>donnees_cdm.js</b> dans ce dossier, puis rouvrez la page.";
+    return;
+  }
+  var withXg=Object.keys(TEAMS).filter(function(n){return (TEAMS[n].xgf||[]).filter(function(x){return x!=null;}).length>=2;}).length;
+  $("dataInfo").innerHTML="Données chargées : <b>"+Object.keys(TEAMS).length+" équipes</b> ("+withXg+" avec xG), "+UPCOMING.length+" matchs à venir, "+HISTORY.length+" d'historique.";
+  fillSelects(); chipGroups();
+  $("go").addEventListener("click",function(){STATE.media="manual"; STATE.hist=null; runAnalyse();});
+  initTabs(); fillUpcoming();
+  $("d1").value="2026-06-01"; $("d2").value="2026-07-31";
+  ["d1","d2","market"].forEach(function(id){$(id).addEventListener("change",renderBacktest);});
+  renderBacktest();
+  if(UPCOMING.length){ loadFixture(0); } else { STATE.media="manual"; runAnalyse(); }
+  selectTab("analyse");
+});
+</script>
+</body>
+</html>
