@@ -35,7 +35,7 @@ COMPETITIONS=[
     (10,"Amicaux","nation",[2022,2023,2024,2025]),
 ]
 
-INT_STATS={"Total Shots":"ts","Shots on Goal":"sot","Shots insidebox":"sib","Shots outsidebox":"sob",
+INT_STATS={"Total Shots":"ts","Shots on Goal":"sot","Shots off Goal":"sog","Shots insidebox":"sib","Shots outsidebox":"sob",
     "Blocked Shots":"blk","Corner Kicks":"cor","Fouls":"fouls","Offsides":"off","Yellow Cards":"yc",
     "Red Cards":"rc","Goalkeeper Saves":"sav","Total passes":"pas","Passes accurate":"pacc"}
 PCT_STATS={"Ball Possession":"poss","Passes %":"ppct"}
@@ -97,12 +97,67 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
         elif st in ("NS","TBD"):
             upcoming_raw[fid]={"date":fx["fixture"]["date"][:10],"h":h,"a":a,"lname":lg.get("name","")}
 
+ODDSFILE="odds.json"
+ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
+    "home total shotongoal","away total shotongoal","home shots on target","away shots on target"}
+def _parse_ou(values):
+    over={}; under={}
+    for v in (values or []):
+        val=str(v.get("value","")); od=v.get("odd")
+        try: od=float(od)
+        except: continue
+        parts=val.replace(":"," ").split()
+        if len(parts)<2: continue
+        side=parts[0].lower()
+        try: ln=float(parts[-1].replace(",","."))
+        except: continue
+        if side.startswith("o"): over[ln]=od
+        elif side.startswith("u"): under[ln]=od
+    rows=[]
+    for ln in sorted(set(list(over.keys())+list(under.keys()))):
+        if ln in over and ln in under: rows.append([ln,over[ln],under[ln]])
+    return rows
+def _balanced(rows):
+    pts=[]
+    for ln,oo,uu in rows:
+        io=1.0/oo; iu=1.0/uu; pts.append((ln, io/(io+iu)))
+    pts.sort()
+    for i in range(len(pts)-1):
+        a=pts[i]; b=pts[i+1]
+        if a[1]>=0.5>=b[1]:
+            t=(a[1]-0.5)/(a[1]-b[1]) if a[1]!=b[1] else 0.0
+            return round(a[0]+t*(b[0]-a[0]),1)
+    return None
+def collect_odds(upcoming_raw, used, limit=40):
+    odds=load_json(ODDSFILE,{})
+    items=sorted(upcoming_raw.items(), key=lambda kv: kv[1].get("date",""))[:limit]
+    for fid,u in items:
+        if not can_continue(used): break
+        try: resp=api_get("/odds",{"fixture":fid},used)
+        except Stop: break
+        time.sleep(SLEEP)
+        markets={}
+        for blk in resp:
+            for bk in blk.get("bookmakers",[]):
+                bname=bk.get("name")
+                for bet in bk.get("bets",[]):
+                    nm=(bet.get("name") or "")
+                    if nm.lower() in ODDS_MARKETS:
+                        rows=_parse_ou(bet.get("values"))
+                        if not rows: continue
+                        if (nm not in markets) or (bname in ("Pinnacle","Bet365")):
+                            markets[nm]={"book":bname,"rows":rows,"bl":_balanced(rows)}
+        if markets:
+            odds[fid]={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets}
+    json.dump(odds,open(ODDSFILE,"w",encoding="utf-8"))
+    return odds
+
 def run():
     if not API_KEY: print("ERREUR : secret API_FOOTBALL_KEY manquant."); sys.exit(1)
     progress=load_json(PROGRESS,{})
     progress.setdefault("priority_teams",{}); progress.setdefault("fixtures_done",{})
     progress.setdefault("pending_fixtures",[]); progress.setdefault("upcoming_raw",{})
-    matches=load_json(MATCHES,{}); used=[0]
+    matches=load_json(MATCHES,{}); used=[0]; odds=load_json(ODDSFILE,{})
     print(datetime.datetime.now(datetime.timezone.utc).strftime("== Run %d/%m %H:%M UTC =="))
     if matches:
         sample=next(iter(matches.values()))
@@ -156,21 +211,24 @@ def run():
                 "h":it["h"],"a":it["a"],"gh":it["gh"],"ga":it["ga"],
                 "H":parse_side(per.get(it["h"],{})),"A":parse_side(per.get(it["a"],{}))}
             time.sleep(SLEEP)
+        odds=collect_odds(progress["upcoming_raw"], used)
     except Stop:
         print("  Pause (quota/plafond). Reprise au prochain run.")
     progress["pending_fixtures"]=[it for it in progress["pending_fixtures"] if it["fid"] not in matches]
-    aggregate_and_write(matches, progress["upcoming_raw"])
+    aggregate_and_write(matches, progress["upcoming_raw"], odds)
     json.dump(progress,open(PROGRESS,"w",encoding="utf-8")); json.dump(matches,open(MATCHES,"w",encoding="utf-8"))
     print(f"  Requetes: {used[0]} | matchs: {len(matches)} | attente: {len(progress['pending_fixtures'])}")
 
 def rec(opp,comp,season,home,gf,ga,me,opst):
     res="W" if gf>ga else ("D" if gf==ga else "L")
     d={"opp":opp,"comp":comp,"season":season,"home":home,"gf":gf,"ga":ga,"res":res,"a_ts":opst.get("ts",0),"a_sot":opst.get("sot",0),"a_xg":opst.get("xg")}
-    for k in ("ts","sot","sib","sob","blk","poss","cor","fouls","off","yc","rc","sav","pas","pacc","ppct","xg"):
+    STK=("ts","sot","sog","sib","sob","blk","poss","cor","fouls","off","yc","rc","sav","pas","pacc","ppct","xg")
+    for k in STK:
         d[k]=me.get(k,0)
+    d["o"]={k:opst.get(k,0) for k in STK}
     return d
 
-def aggregate_and_write(matches, upcoming_raw):
+def aggregate_and_write(matches, upcoming_raw, odds=None):
     byteam={}; comps=set()
     for fid,m in matches.items():
         comps.add(m.get("lname",""))
@@ -193,7 +251,8 @@ def aggregate_and_write(matches, upcoming_raw):
     payload=("// Genere automatiquement (GitHub Actions). Maj: "+datetime.datetime.now(datetime.timezone.utc).strftime("%d/%m/%Y %H:%M")+" UTC\n"
         "var LEAGUE_AVG = "+json.dumps(la)+";\n"
         "var COMPS = "+json.dumps(comps,ensure_ascii=False)+";\n"
-        "var TEAMS = "+json.dumps(TEAMS,ensure_ascii=False)+";\n")
+        "var TEAMS = "+json.dumps(TEAMS,ensure_ascii=False)+";\n"
+        "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n")
     open(OUTPUT,"w",encoding="utf-8").write(payload)
     print(f"  -> {OUTPUT}: {len(TEAMS)} equipes, {len(comps)} competitions.")
 
