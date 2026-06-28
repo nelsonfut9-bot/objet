@@ -179,6 +179,7 @@ function frn(x){return String(x).replace(".",",");}
 function esc(s){return String(s).replace(/"/g,"&quot;");}
 function dmy(d){return d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4);}
 function dm(d){return d.slice(8,10)+"/"+d.slice(5,7);}
+function frTime(iso){if(!iso)return "";try{var d=new Date(iso);if(isNaN(d))return "";return d.toLocaleTimeString("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit"});}catch(e){return "";}}
 function mean(a){a=a.filter(function(x){return x!=null;});return a.length?a.reduce(function(s,x){return s+x;},0)/a.length:0;}
 function std(a){a=a.filter(function(x){return x!=null;});if(a.length<2)return 1.7;var m=mean(a);return Math.sqrt(a.reduce(function(s,x){return s+(x-m)*(x-m);},0)/a.length);}
 function erf(x){var t=1/(1+0.3275911*Math.abs(x));var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
@@ -254,7 +255,7 @@ function showTeam(name,comp,season){
       '<td class="num">'+m.ts+'</td><td class="num">'+m.sot+'</td><td><span class="back">détail &rsaquo;</span></td></tr>';
   }).join("");
   var upRows=up.map(function(u){
-    return '<tr><td class="small muted">'+dm(u.date)+'</td><td>'+(u.home?'':'<span class="muted">@</span> ')+fr(u.opp)+' <span class="compTag">· '+u.comp+'</span></td><td class="small muted">à venir</td></tr>';
+    var hh=frTime(u.time); return '<tr><td class="small muted">'+dm(u.date)+(hh?' '+hh:'')+'</td><td>'+(u.home?'':'<span class="muted">@</span> ')+fr(u.opp)+' <span class="compTag">· '+u.comp+'</span></td><td class="small muted">à venir</td></tr>';
   }).join("");
   $("teampage").className="panel"; $("teampage").innerHTML=
     '<span class="back" id="backList">‹ retour à la liste</span>'+
@@ -440,36 +441,33 @@ function findOdds(home,away){
 function oddsHTML(o){
   if(!o||!o.markets)return "";
   var lab={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadres (match)","Shots. Home Total":"Tirs "+fr(o.h),"Shots. Away Total":"Tirs "+fr(o.a),"Home Total ShotOnGoal":"Tirs cadres "+fr(o.h),"Away Total ShotOnGoal":"Tirs cadres "+fr(o.a),"Home Shots On Target":"Tirs cadres "+fr(o.h),"Away Shots On Target":"Tirs cadres "+fr(o.a)};
-  var rows="";
+  var blocks="";
   for(var m in o.markets){var mk=o.markets[m];
-    var ligne=mk.bl!=null?("<b>"+frn(mk.bl)+"</b>"):"&mdash;";
-    rows+='<div class="srow"><span class="lab">'+(lab[m]||m)+' <span class="compTag">('+(mk.book||"book")+')</span></span><span>ligne equilibre &asymp; '+ligne+'</span></div>';
+    var lr="";
+    (mk.rows||[]).forEach(function(r){lr+='<div class="srow" style="font-weight:600"><span>seuil '+frn(r[0])+'</span><span>Over <b>'+Number(r[1]).toFixed(2)+'</b> &middot; Under <b>'+Number(r[2]).toFixed(2)+'</b></span></div>';});
+    blocks+='<div style="margin:6px 0 10px"><div class="srow"><span class="lab">'+(lab[m]||m)+' <span class="compTag">('+(mk.book||"book")+')</span></span><span>equilibre &asymp; <b>'+(mk.bl!=null?frn(mk.bl):"&mdash;")+'</b></span></div>'+lr+'</div>';
   }
-  if(!rows)return "";
-  return '<div class="secTitle">Cotes du marche (bookmakers)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Cotes reelles via API-Football. A comparer a mon estimation.</div>'+rows+'</div>';
+  if(!blocks)return "";
+  return '<div class="secTitle">Cotes du marche (bookmakers)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Cotes reelles via API-Football, sur ce vrai match.</div>'+blocks+'</div>';
+}
+function teamCard(R,lieu){
+  if(!R||R.noData)return '<div class="b"><div class="l">'+lieu+' — '+fr(R&&R.name?R.name:"?")+'</div><div class="small muted" style="margin-top:8px">Pas assez de données pour cette équipe.</div></div>';
+  return '<div class="b"><div class="l">'+lieu+' — '+fr(R.name)+'</div>'+
+    '<div style="margin-top:8px;font-size:14px">Tirs : <span class="big" style="font-size:26px">'+R.exp+'</span> <span class="muted small">('+R.intv[0]+'–'+R.intv[1]+')</span></div>'+
+    '<div style="font-size:14px;margin-top:2px">Tirs cadrés : <span class="big" style="font-size:26px;color:var(--accent2)">'+R.expSot+'</span> <span class="muted small">('+R.intvS[0]+'–'+R.intvS[1]+')</span></div>'+
+    recoHTML(R.recoShots,"Tirs "+fr(R.name))+recoHTML(R.recoSot,"Cadrés "+fr(R.name))+'</div>';
 }
 function runAnalyse(){
-  if($("home").value===$("away").value)return;
-  var ck=$("comp").value;
-  var R=predict($("home").value,$("away").value,true,ck);
-  if(R.noData){$("result").classList.remove("hidden");$("result").innerHTML='<div class="err">Données insuffisantes pour '+fr(R.name)+' — la base se remplit automatiquement.</div>';return;}
-  var trend=R.form5>R.form10+0.4?"en hausse":(R.form5<R.form10-0.4?"en baisse":"stable");
-  var pb=function(arr,unit){return arr.map(function(p){return '<div class="prob"><div class="top"><span>Plus de '+frn(p[0])+' '+unit+'</span><span>'+p[1]+'%</span></div><div class="bar"><i style="width:'+p[1]+'%"></i></div></div>';}).join("");};
+  var h=$("home").value, a=$("away").value, ck=$("comp").value;
   $("result").classList.remove("hidden");
-  $("result").innerHTML='<div class="secTitle" style="margin-top:0">'+fr($("home").value)+' vs '+fr($("away").value)+' — '+(C[ck]?C[ck].l:"")+'</div>'+
-    '<div class="est"><div class="b"><div class="l">Tirs estimés</div><div class="big">'+R.exp+'</div><div class="rng">fourchette '+R.intv[0]+'–'+R.intv[1]+'</div></div>'+
-    '<div class="b s"><div class="l">Tirs cadrés estimés</div><div class="big">'+R.expSot+'</div><div class="rng">fourchette '+R.intvS[0]+'–'+R.intvS[1]+'</div></div></div>'+
-    recoHTML(R.recoShots,"Tirs")+recoHTML(R.recoSot,"Tirs cadrés")+
-    oddsHTML(findOdds($("home").value,$("away").value))+
-    '<div class="secTitle">Mes cotes équitables — tirs (à comparer aux bookmakers)</div>'+fairTable(R.exp,R.sd)+
-    '<div class="secTitle">Mes cotes équitables — tirs cadrés</div>'+fairTable(R.expSot,R.sdSot)+
-    '<div class="secTitle">Probabilités — tirs</div>'+pb(R.probs,"tirs")+
-    '<div class="secTitle">Probabilités — tirs cadrés</div>'+pb(R.probsS,"cadrés")+
-    '<div class="secTitle">Pourquoi</div><ul class="reasons">'+
-      '<li>'+fr(R.name)+' : <b>'+R.form10+'</b> tirs/match (10 derniers), <b>'+R.form5+'</b> sur les 5 derniers — forme '+trend+'.</li>'+
-      '<li>'+fr(R.opp)+' concède <b>'+R.oppCd+'</b> tirs/match — défense '+(R.defF<0.85?"solide":R.defF<1?"correcte":"perméable")+'.</li>'+
-      (R.xg?'<li>Qualité des occasions : <b>'+R.xg+'</b> xG/match.</li>':'')+
-      '<li>'+fr(R.name)+' joue à domicile (+12% de volume).</li></ul>';
+  if(!h||!a||h===a){$("result").innerHTML='<div class="err">Choisis deux équipes différentes.</div>';return;}
+  var Rh=predict(h,a,true,ck), Ra=predict(a,h,false,ck);
+  var html='<div class="secTitle" style="margin-top:0">'+fr(h)+' (domicile) vs '+fr(a)+' (extérieur) — '+(C[ck]?C[ck].l:"")+'</div>'+
+    '<div class="est">'+teamCard(Rh,"Domicile")+teamCard(Ra,"Extérieur")+'</div>'+
+    oddsHTML(findOdds(h,a));
+  if(Rh&&!Rh.noData){html+='<div class="secTitle">Mes cotes équitables — tirs '+fr(h)+'</div>'+fairTable(Rh.exp,Rh.sd);}
+  if(Ra&&!Ra.noData){html+='<div class="secTitle">Mes cotes équitables — tirs '+fr(a)+'</div>'+fairTable(Ra.exp,Ra.sd);}
+  $("result").innerHTML=html;
 }
 
 // ---- backtest ----
@@ -531,11 +529,11 @@ function buildUpcoming(){
   var seen={},list=[];
   Object.keys(TEAMS).forEach(function(n){(TEAMS[n].upcoming||[]).forEach(function(u){
     var home=u.home?n:u.opp, away=u.home?u.opp:n, key=u.date+"|"+home+"|"+away;
-    if(seen[key])return; seen[key]=1; list.push({date:u.date,home:home,away:away,comp:u.comp});
+    if(seen[key])return; seen[key]=1; list.push({date:u.date,time:u.time,home:home,away:away,comp:u.comp});
   });});
   list.sort(function(a,b){return a.date<b.date?-1:1;});
   document.querySelector("#up tbody").innerHTML=list.slice(0,100).map(function(m){
-    return '<tr class="click" data-h="'+esc(m.home)+'" data-a="'+esc(m.away)+'"><td class="small muted">'+dm(m.date)+'</td><td>'+fr(m.home)+' <span class="muted">vs</span> '+fr(m.away)+'</td><td class="compTag">'+m.comp+'</td><td><span class="back">analyser &rsaquo;</span></td></tr>';
+    var hh=frTime(m.time); return '<tr class="click" data-h="'+esc(m.home)+'" data-a="'+esc(m.away)+'"><td class="small muted">'+dm(m.date)+(hh?'<br>'+hh:'')+'</td><td>'+fr(m.home)+' <span class="muted">vs</span> '+fr(m.away)+'</td><td class="compTag">'+m.comp+'</td><td><span class="back">analyser &rsaquo;</span></td></tr>';
   }).join("")||'<tr><td colspan="4" class="muted" style="text-align:center;padding:18px">Pas encore de matchs à venir collectés — la base se remplit automatiquement.</td></tr>';
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }

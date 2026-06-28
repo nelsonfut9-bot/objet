@@ -95,7 +95,7 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
                 "league":str(lid),"lname":lg.get("name",""),"season":lg.get("season",""),
                 "gh":fx.get("goals",{}).get("home") or 0,"ga":fx.get("goals",{}).get("away") or 0,"prio":prio})
         elif st in ("NS","TBD"):
-            upcoming_raw[fid]={"date":fx["fixture"]["date"][:10],"h":h,"a":a,"lname":lg.get("name","")}
+            upcoming_raw[fid]={"date":fx["fixture"]["date"][:10],"time":fx["fixture"]["date"],"h":h,"a":a,"lname":lg.get("name","")}
 
 ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
@@ -241,8 +241,8 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
         recs.sort(key=lambda r:r["date"],reverse=True)
         up=[]
         for fid,u in upcoming_raw.items():
-            if u["h"]==name: up.append({"date":u["date"],"opp":u["a"],"comp":u["lname"],"home":True})
-            elif u["a"]==name: up.append({"date":u["date"],"opp":u["h"],"comp":u["lname"],"home":False})
+            if u["h"]==name: up.append({"date":u["date"],"time":u.get("time"),"opp":u["a"],"comp":u["lname"],"home":True})
+            elif u["a"]==name: up.append({"date":u["date"],"time":u.get("time"),"opp":u["h"],"comp":u["lname"],"home":False})
         up.sort(key=lambda x:x["date"])
         TEAMS[name]={"matches":recs[:MAX_PER_TEAM],"upcoming":up[:8]}
     allts=[r["ts"] for t in TEAMS.values() for r in t["matches"]]
