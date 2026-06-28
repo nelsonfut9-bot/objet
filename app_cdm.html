@@ -29,7 +29,10 @@
   .thead{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
   .thead .name{font-size:26px;font-weight:800}
   .thead .rec{font-size:13px;color:var(--muted)}
-  .form{display:flex;gap:4px;margin:4px 0 0}
+  .pcts{display:flex;gap:8px;margin:6px 0 0;flex-wrap:wrap}
+  .pcts .pc{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700}
+  .pcts .pc b{font-size:15px} .pcts .pc.w b{color:var(--good)} .pcts .pc.d b{color:#cdd8e3} .pcts .pc.l b{color:var(--bad)}
+  .form{display:flex;gap:4px;margin:8px 0 0}
   .chip{width:22px;height:22px;border-radius:5px;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;color:#06281f}
   .chip.W{background:var(--good)} .chip.D{background:#5b6b7d;color:#fff} .chip.L{background:var(--bad);color:#fff}
   .secTitle{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;font-weight:700}
@@ -64,13 +67,29 @@
   .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px}
   .card .v{font-size:24px;font-weight:800}.card .k{font-size:11px;color:var(--muted)}
   .card.g .v{color:var(--good)}.card.w .v{color:var(--warn)}
+  .filterbar{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 8px}
+  .filterbar .field{min-width:130px}
+  .modal{position:fixed;inset:0;background:rgba(6,12,20,.86);z-index:60;overflow:auto;padding:18px}
+  .modal .box{max-width:680px;margin:10px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .mclose{float:right;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;font-weight:800;padding:0 4px}
+  .mclose:hover{color:var(--txt)}
+  .mh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 2px}
+  .mh .tm{flex:1;text-align:center;font-size:17px;font-weight:800}
+  .mh .sc{font-size:30px;font-weight:800;white-space:nowrap}
+  .mmeta{text-align:center;color:var(--muted);font-size:12px;margin-bottom:14px}
+  .srow{display:flex;justify-content:space-between;font-size:14px;font-weight:800;margin-top:10px}
+  .srow .lab{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  .cbar{display:flex;height:6px;border-radius:4px;overflow:hidden;background:var(--panel2);margin:4px 0 2px}
+  .cbar i{display:block;height:100%} .cbar i.l{background:var(--good)} .cbar i.r{background:var(--accent2)}
+  .legend{display:flex;justify-content:center;gap:18px;font-size:12px;color:var(--muted);margin:2px 0 6px}
+  .legend b{font-weight:800}.legend .lg{color:var(--good)}.legend .rg{color:var(--accent2)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Stats & prédictions <span class="em">football</span></h1>
-    <p class="sub">Fiches d'équipe, historique, et prédictions tirs / tirs cadrés · données API-Football</p>
+    <p class="sub">Fiches d'équipe, historique détaillé, et prédictions tirs / tirs cadrés · données API-Football</p>
     <div class="banner" id="dataInfo">Chargement…</div>
   </header>
   <div class="tabs">
@@ -83,7 +102,7 @@
   <section id="equipes">
     <div class="panel">
       <div class="row">
-        <div class="field"><label>Rechercher une équipe</label><input id="q" placeholder="Ex. Canada, Manchester City…"></div>
+        <div class="field"><label>Rechercher une équipe</label><input id="q" placeholder="Ex. Canada, Allemagne, Manchester City…"></div>
         <div class="field" style="max-width:240px"><label>Compétition</label><select id="fcomp"></select></div>
         <div class="field" style="max-width:150px"><label>Saison</label><select id="fseason"></select></div>
       </div>
@@ -115,13 +134,21 @@
   <section id="suivi" class="hidden">
     <div class="panel">
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
-      <p class="small muted">Prédiction d'avant-match honnête sur les matchs déjà joués (la perf du jour est retirée des moyennes). Échantillon : les matchs récents collectés.</p>
+      <p class="small muted">Prédiction d'avant-match honnête sur les matchs déjà joués (la perf du jour est retirée des moyennes). Cliquez une ligne pour voir le détail du match.</p>
+      <div class="filterbar">
+        <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
+        <div class="field"><label>Championnat</label><select id="btComp"></select></div>
+        <div class="field"><label>Saison</label><select id="btSeason"></select></div>
+        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option></select></div>
+      </div>
       <div class="cards" id="scoreCards"></div>
       <table id="bt"><thead><tr><th>Date</th><th>Match</th><th>Conseil</th><th class="num">Estim.</th><th class="num">Réel</th><th>Pari</th></tr></thead><tbody></tbody></table>
     </div>
   </section>
   <footer style="color:var(--muted);font-size:11px;text-align:center;margin-top:18px">Données API-Football · mise à jour automatique quotidienne</footer>
 </div>
+
+<div id="modal" class="modal hidden"></div>
 
 <script src="donnees_cdm.js"></script>
 <script>
@@ -132,12 +159,15 @@ var NAMES_FR={"Spain":"Espagne","Germany":"Allemagne","England":"Angleterre","Fr
 "Uruguay":"Uruguay","Switzerland":"Suisse","Sweden":"Suède","Denmark":"Danemark","Poland":"Pologne",
 "Serbia":"Serbie","Austria":"Autriche","Wales":"Pays de Galles","Scotland":"Écosse","Turkey":"Turquie",
 "Bosnia and Herzegovina":"Bosnie-Herzégovine","Czech Republic":"Tchéquie","Ireland":"Irlande","Norway":"Norvège",
-"Ghana":"Ghana","Nigeria":"Nigéria","Cameroon":"Cameroun","Ivory Coast":"Côte d'Ivoire","Tunisia":"Tunisie",
+"Ghana":"Ghana","Nigeria":"Nigéria","Cameroon":"Cameroun","Ivory Coast":"Côte d Ivoire","Tunisia":"Tunisie",
 "Algeria":"Algérie","Iran":"Iran","Saudi Arabia":"Arabie Saoudite","Qatar":"Qatar","Australia":"Australie",
 "Colombia":"Colombie","Peru":"Pérou","Chile":"Chili","Ecuador":"Équateur","Paraguay":"Paraguay"};
 function fr(n){return NAMES_FR[n]||n;}
 function r1(x){return Math.round(x*10)/10;} function r2(x){return Math.round(x*100)/100;}
 function frn(x){return String(x).replace(".",",");}
+function esc(s){return String(s).replace(/"/g,"&quot;");}
+function dmy(d){return d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4);}
+function dm(d){return d.slice(8,10)+"/"+d.slice(5,7);}
 function mean(a){a=a.filter(function(x){return x!=null;});return a.length?a.reduce(function(s,x){return s+x;},0)/a.length:0;}
 function std(a){a=a.filter(function(x){return x!=null;});if(a.length<2)return 1.7;var m=mean(a);return Math.sqrt(a.reduce(function(s,x){return s+(x-m)*(x-m);},0)/a.length);}
 function erf(x){var t=1/(1+0.3275911*Math.abs(x));var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
@@ -152,7 +182,15 @@ if(typeof LEAGUE_AVG==="undefined")var LEAGUE_AVG=12.5;
 if(typeof COMPS==="undefined")var COMPS=[];
 var $=function(id){return document.getElementById(id);};
 
-// ---- filtrage des matchs d'une equipe ----
+var DETAIL_STATS=[["poss","Possession %",0],["xg","Buts attendus (xG)",2],["ts","Total des tirs",0],
+  ["sot","Tirs cadrés",0],["sog","Tirs non cadrés",0],["sib","Tirs dans la surface",0],
+  ["sob","Tirs hors surface",0],["blk","Tirs bloqués",0],["cor","Corners",0],
+  ["sav","Arrêts du gardien",0],["fouls","Fautes",0],["off","Hors-jeu",0],
+  ["pas","Passes",0],["pacc","Passes réussies",0],["ppct","Précision passes %",0],
+  ["yc","Cartons jaunes",0],["rc","Cartons rouges",0]];
+
+var curTeam=null;
+
 function teamMatches(name,comp,season){
   var t=TEAMS[name]; if(!t)return [];
   return t.matches.filter(function(m){
@@ -161,9 +199,9 @@ function teamMatches(name,comp,season){
     return true;
   });
 }
-function teamComps(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.comp)s[m.comp]=1;});return Object.keys(s);}
+function teamComps(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.comp)s[m.comp]=1;});return Object.keys(s).sort();}
+function teamSeasons(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.season)s[m.season]=1;});return Object.keys(s).sort().reverse();}
 
-// ---- liste d'equipes ----
 function renderTeamList(){
   var q=($("q").value||"").toLowerCase(), comp=$("fcomp").value, season=$("fseason").value;
   var names=Object.keys(TEAMS).filter(function(n){
@@ -172,61 +210,106 @@ function renderTeamList(){
     if(season&&season!=="all"){var ok=TEAMS[n].matches.some(function(m){return String(m.season)===String(season);});if(!ok)return false;}
     return true;
   }).sort(function(a,b){return fr(a).localeCompare(fr(b));});
-  $("teamlist").innerHTML=names.slice(0,300).map(function(n){
-    return '<div class="titem" data-t="'+n.replace(/"/g,"&quot;")+'">'+fr(n)+' <span class="n">'+TEAMS[n].matches.length+' m.</span></div>';
+  $("teamlist").innerHTML=names.slice(0,400).map(function(n){
+    return '<div class="titem" data-t="'+esc(n)+'">'+fr(n)+' <span class="n">'+TEAMS[n].matches.length+' m.</span></div>';
   }).join("")||'<div class="muted small">Aucune équipe (la base se remplit automatiquement).</div>';
-  document.querySelectorAll("#teamlist .titem").forEach(function(el){el.addEventListener("click",function(){showTeam(el.dataset.t);});});
+  document.querySelectorAll("#teamlist .titem").forEach(function(el){el.addEventListener("click",function(){showTeam(el.dataset.t,"all","all");});});
 }
 
-// ---- fiche equipe ----
 function avg(ms,k){return ms.length?r1(mean(ms.map(function(m){return m[k];}))):"—";}
-function showTeam(name){
-  var comp=$("fcomp").value, season=$("fseason").value;
+function showTeam(name,comp,season){
+  curTeam=name; comp=comp||"all"; season=season||"all";
+  var allComps=teamComps(name), allSeasons=teamSeasons(name);
   var ms=teamMatches(name,comp,season);
   var w=ms.filter(function(m){return m.res==="W";}).length, d=ms.filter(function(m){return m.res==="D";}).length, l=ms.filter(function(m){return m.res==="L";}).length;
+  var tot=ms.length||1;
+  var pw=Math.round(w/tot*100), pd=Math.round(d/tot*100), pl=Math.round(l/tot*100);
   var gf=ms.reduce(function(s,m){return s+m.gf;},0), ga=ms.reduce(function(s,m){return s+m.ga;},0);
+  var dates=ms.map(function(m){return m.date;}).sort();
+  var periode=ms.length?("du "+dmy(dates[0])+" au "+dmy(dates[dates.length-1])):"";
   var form=ms.slice(0,8).reverse();
   function S(k,v,cls){return '<div class="stat"><span class="k">'+k+'</span><span class="v '+(cls||"")+'">'+v+'</span></div>';}
   var up=(TEAMS[name].upcoming||[]);
-  var matchRows=ms.slice(0,20).map(function(m){
-    return '<tr><td class="small muted">'+m.date.slice(8,10)+'/'+m.date.slice(5,7)+'</td>'+
+  var compOpts='<option value="all">Toutes compétitions</option>'+allComps.map(function(c){return '<option value="'+esc(c)+'"'+(c===comp?' selected':'')+'>'+c+'</option>';}).join("");
+  var seasonOpts='<option value="all">Toutes saisons</option>'+allSeasons.map(function(s){return '<option value="'+s+'"'+(String(s)===String(season)?' selected':'')+'>'+s+'</option>';}).join("");
+  var matchRows=ms.map(function(m){
+    return '<tr class="click" data-d="'+m.date+'" data-o="'+esc(m.opp)+'"><td class="small muted">'+dm(m.date)+'</td>'+
       '<td>'+(m.home?'':'<span class="muted">@</span> ')+fr(m.opp)+' <span class="compTag">· '+m.comp+'</span></td>'+
       '<td class="num">'+m.gf+'–'+m.ga+'</td><td><span class="pill '+m.res+'">'+m.res+'</span></td>'+
-      '<td class="num">'+m.ts+'</td><td class="num">'+m.sot+'</td></tr>';
+      '<td class="num">'+m.ts+'</td><td class="num">'+m.sot+'</td><td><span class="back">détail &rsaquo;</span></td></tr>';
   }).join("");
   var upRows=up.map(function(u){
-    return '<tr><td class="small muted">'+u.date.slice(8,10)+'/'+u.date.slice(5,7)+'</td><td>'+(u.home?'':'<span class="muted">@</span> ')+fr(u.opp)+' <span class="compTag">· '+u.comp+'</span></td><td class="small muted">à venir</td></tr>';
+    return '<tr><td class="small muted">'+dm(u.date)+'</td><td>'+(u.home?'':'<span class="muted">@</span> ')+fr(u.opp)+' <span class="compTag">· '+u.comp+'</span></td><td class="small muted">à venir</td></tr>';
   }).join("");
   $("teampage").className="panel"; $("teampage").innerHTML=
     '<span class="back" id="backList">‹ retour à la liste</span>'+
     '<div class="thead"><div><div class="name">'+fr(name)+'</div>'+
-      '<div class="rec">'+ms.length+' matchs · '+w+'V '+d+'N '+l+'D · '+gf+' buts marqués, '+ga+' encaissés</div>'+
+      '<div class="rec">'+ms.length+' matchs '+(periode?'· '+periode:'')+' · '+gf+' buts marqués, '+ga+' encaissés</div>'+
+      '<div class="pcts"><span class="pc w">Victoires <b>'+w+'</b> ('+pw+'%)</span><span class="pc d">Nuls <b>'+d+'</b> ('+pd+'%)</span><span class="pc l">Défaites <b>'+l+'</b> ('+pl+'%)</span></div>'+
       '<div class="form">'+form.map(function(m){return '<div class="chip '+m.res+'" title="'+fr(m.opp)+' '+m.gf+'-'+m.ga+'">'+m.res+'</div>';}).join("")+'</div>'+
     '</div></div>'+
-    (ms.length===0?'<div class="err" style="margin-top:12px">Pas encore de données pour cette équipe sur ce filtre. La base se remplit automatiquement chaque jour.</div>':
-    '<div class="secTitle">Attaque (par match)</div><div class="grid">'+
+    '<div class="filterbar" style="margin-top:14px"><div class="field"><label>Compétition</label><select id="tcomp">'+compOpts+'</select></div>'+
+      '<div class="field"><label>Saison</label><select id="tseason">'+seasonOpts+'</select></div></div>'+
+    (ms.length===0?'<div class="err" style="margin-top:6px">Pas de données pour cette équipe sur ce filtre. Essayez « Toutes compétitions / Toutes saisons », ou attendez la collecte automatique.</div>':
+    '<div class="secTitle">Attaque (moyenne par match)</div><div class="grid">'+
       S("Buts",avg(ms,"gf"))+S("Tirs",avg(ms,"ts"))+S("Tirs cadrés",avg(ms,"sot"),"d")+
-      S("Tirs dans la surface",avg(ms,"sib"))+S("Tirs hors surface",avg(ms,"sob"))+
-      S("xG",avg(ms,"xg"),"x")+S("Corners",avg(ms,"cor"))+
+      S("Tirs non cadrés",avg(ms,"sog"))+S("Tirs dans la surface",avg(ms,"sib"))+S("Tirs hors surface",avg(ms,"sob"))+
+      S("Tirs bloqués",avg(ms,"blk"))+S("xG",avg(ms,"xg"),"x")+S("Corners",avg(ms,"cor"))+
     '</div>'+
     '<div class="secTitle">Possession & passes</div><div class="grid">'+
       S("Possession %",avg(ms,"poss"))+S("Passes",avg(ms,"pas"))+S("Passes réussies",avg(ms,"pacc"))+S("Précision passes %",avg(ms,"ppct"))+
     '</div>'+
-    '<div class="secTitle">Défense (par match)</div><div class="grid">'+
+    '<div class="secTitle">Défense (moyenne par match)</div><div class="grid">'+
       S("Buts encaissés",avg(ms,"ga"))+S("Tirs concédés",avg(ms,"a_ts"))+S("Tirs cadrés concédés",avg(ms,"a_sot"))+
-      S("xG concédé",avg(ms,"a_xg"),"x")+S("Arrêts du gardien",avg(ms,"sav"))+S("Tirs bloqués",avg(ms,"blk"))+
+      S("xG concédé",avg(ms,"a_xg"),"x")+S("Arrêts du gardien",avg(ms,"sav"))+
     '</div>'+
-    '<div class="secTitle">Discipline (par match)</div><div class="grid">'+
+    '<div class="secTitle">Discipline (moyenne par match)</div><div class="grid">'+
       S("Fautes",avg(ms,"fouls"))+S("Hors-jeu",avg(ms,"off"))+S("Cartons jaunes",avg(ms,"yc"))+S("Cartons rouges",avg(ms,"rc"))+
     '</div>'+
     (up.length?'<div class="secTitle">Prochains matchs</div><table><tbody>'+upRows+'</tbody></table>':'')+
-    '<div class="secTitle">Derniers matchs</div><table><thead><tr><th>Date</th><th>Adversaire</th><th class="num">Score</th><th></th><th class="num">Tirs</th><th class="num">Cadrés</th></tr></thead><tbody>'+matchRows+'</tbody></table>');
+    '<div class="secTitle">Tous les matchs ('+ms.length+') — cliquez pour le détail</div><table><thead><tr><th>Date</th><th>Adversaire</th><th class="num">Score</th><th></th><th class="num">Tirs</th><th class="num">Cadrés</th><th></th></tr></thead><tbody>'+matchRows+'</tbody></table>');
   $("teampage").classList.remove("hidden");
   $("backList").addEventListener("click",function(){$("teampage").classList.add("hidden");});
+  $("tcomp").addEventListener("change",function(){showTeam(name,$("tcomp").value,$("tseason").value);});
+  $("tseason").addEventListener("change",function(){showTeam(name,$("tcomp").value,$("tseason").value);});
+  document.querySelectorAll("#teampage tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(name,tr.dataset.d,tr.dataset.o);});});
   $("teampage").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
-// ---- prediction ----
+function findRec(name,date,opp){var t=TEAMS[name];if(!t)return null;for(var i=0;i<t.matches.length;i++){var m=t.matches[i];if(m.date===date&&m.opp===opp)return m;}return null;}
+function oppVal(me,orec,k){
+  if(orec&&orec[k]!=null)return orec[k];
+  if(me.o&&me.o[k]!=null)return me.o[k];
+  if(k==="ts")return me.a_ts; if(k==="sot")return me.a_sot; if(k==="xg")return me.a_xg;
+  return null;
+}
+function statBar(lab,lv,rv,dec){
+  if(lv==null&&rv==null)return "";
+  var a=lv==null?0:lv, b=rv==null?0:rv, tot=a+b;
+  var lp=tot>0?(a/tot*100):50, rp=100-lp;
+  var lt=lv==null?"—":(dec?lv.toFixed(dec):lv), rt=rv==null?"—":(dec?rv.toFixed(dec):rv);
+  return '<div class="srow"><span>'+lt+'</span><span class="lab">'+lab+'</span><span>'+rt+'</span></div>'+
+    '<div class="cbar"><i class="l" style="width:'+lp+'%"></i><i class="r" style="width:'+rp+'%"></i></div>';
+}
+function openMatch(name,date,opp){
+  var me=findRec(name,date,opp); if(!me){return;}
+  var orec=findRec(opp,date,name);
+  var compLabel=me.comp||""; var saison=me.season?(" · "+me.season):"";
+  var lieu=me.home?"":" (extérieur)";
+  var bars=DETAIL_STATS.map(function(s){return statBar(s[1],me[s[0]]==null?null:me[s[0]],oppVal(me,orec,s[0]),s[2]);}).join("");
+  var note=orec?"":'<div class="small muted" style="text-align:center;margin-top:10px">Stats adverses partielles (l’équipe adverse n’est pas dans la base détaillée).</div>';
+  $("modal").innerHTML='<div class="box"><span class="mclose" id="mClose">×</span>'+
+    '<div class="mmeta" style="margin-bottom:4px">'+compLabel+saison+' · '+dmy(date)+lieu+'</div>'+
+    '<div class="mh"><div class="tm" style="text-align:right">'+fr(name)+'</div>'+
+      '<div class="sc">'+me.gf+' – '+me.ga+'</div>'+
+      '<div class="tm" style="text-align:left">'+fr(opp)+'</div></div>'+
+    '<div class="legend"><span class="lg">■ <b>'+fr(name)+'</b></span><span class="rg">■ <b>'+fr(opp)+'</b></span></div>'+
+    bars+note+'</div>';
+  $("modal").classList.remove("hidden");
+  $("mClose").addEventListener("click",closeModal);
+}
+function closeModal(){$("modal").classList.add("hidden");$("modal").innerHTML="";}
+
 function predict(name,opp,isHome,compKey){
   var t=TEAMS[name], o=TEAMS[opp];
   var ms=t?t.matches:[], os=o?o.matches:[];
@@ -257,14 +340,14 @@ function runAnalyse(){
   var R=predict($("home").value,$("away").value,true,ck);
   if(R.noData){$("result").classList.remove("hidden");$("result").innerHTML='<div class="err">Données insuffisantes pour '+fr(R.name)+' — la base se remplit automatiquement.</div>';return;}
   var trend=R.form5>R.form10+0.4?"en hausse":(R.form5<R.form10-0.4?"en baisse":"stable");
-  var pb=function(arr){return arr.map(function(p){return '<div class="prob"><div class="top"><span>Plus de '+frn(p[0])+'</span><span>'+p[1]+'%</span></div><div class="bar"><i style="width:'+p[1]+'%"></i></div></div>';}).join("");};
+  var pb=function(arr,unit){return arr.map(function(p){return '<div class="prob"><div class="top"><span>Plus de '+frn(p[0])+' '+unit+'</span><span>'+p[1]+'%</span></div><div class="bar"><i style="width:'+p[1]+'%"></i></div></div>';}).join("");};
   $("result").classList.remove("hidden");
   $("result").innerHTML='<div class="secTitle" style="margin-top:0">'+fr($("home").value)+' vs '+fr($("away").value)+' — '+(C[ck]?C[ck].l:"")+'</div>'+
     '<div class="est"><div class="b"><div class="l">Tirs estimés</div><div class="big">'+R.exp+'</div><div class="rng">fourchette '+R.intv[0]+'–'+R.intv[1]+'</div></div>'+
     '<div class="b s"><div class="l">Tirs cadrés estimés</div><div class="big">'+R.expSot+'</div><div class="rng">fourchette '+R.intvS[0]+'–'+R.intvS[1]+'</div></div></div>'+
     recoHTML(R.recoShots,"Tirs")+recoHTML(R.recoSot,"Tirs cadrés")+
-    '<div class="secTitle">Probabilités — tirs</div>'+pb(R.probs)+
-    '<div class="secTitle">Probabilités — tirs cadrés</div>'+pb(R.probsS)+
+    '<div class="secTitle">Probabilités — tirs</div>'+pb(R.probs,"tirs")+
+    '<div class="secTitle">Probabilités — tirs cadrés</div>'+pb(R.probsS,"cadrés")+
     '<div class="secTitle">Pourquoi</div><ul class="reasons">'+
       '<li>'+fr(R.name)+' : <b>'+R.form10+'</b> tirs/match (10 derniers), <b>'+R.form5+'</b> sur les 5 derniers — forme '+trend+'.</li>'+
       '<li>'+fr(R.opp)+' concède <b>'+R.oppCd+'</b> tirs/match — défense '+(R.defF<0.85?"solide":R.defF<1?"correcte":"perméable")+'.</li>'+
@@ -272,47 +355,59 @@ function runAnalyse(){
       '<li>'+fr(R.name)+' joue à domicile (+12% de volume).</li></ul>';
 }
 
-// ---- backtest ----
 function buildBacktest(){
+  var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value;
+  var unit=metric==="sot"?"tirs cadrés":"tirs";
   var rows=[];
   Object.keys(TEAMS).forEach(function(n){
-    TEAMS[n].matches.slice(0,6).forEach(function(m){
-      if(!m.home)return; // une ligne par match (cote domicile)
-      var sf=TEAMS[n].matches.map(function(x){return x.ts;});
-      var i=sf.indexOf(m.ts); var s2=sf.slice(); if(i>=0)s2.splice(i,1);
+    if(fTeam&&fTeam!=="all"&&n!==fTeam)return;
+    TEAMS[n].matches.forEach(function(m){
+      if(!m.home)return;
+      if(fComp&&fComp!=="all"&&m.comp!==fComp)return;
+      if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
+      var arr=TEAMS[n].matches.map(function(x){return x[metric];});
+      var real=m[metric];
+      var i=TEAMS[n].matches.indexOf(m); var s2=arr.slice(); if(i>=0)s2.splice(i,1);
       if(s2.length<3)return;
       var attack=0.6*mean(s2.slice(0,5))+0.4*mean(s2.slice(0,10));
-      var o=TEAMS[m.opp]; var oc=o?mean(o.matches.map(function(x){return x.a_ts;})):LEAGUE_AVG;
-      var exp=attack*(0.5+0.5*(oc/LEAGUE_AVG))*1.12; var sd=Math.max(std(s2),1.7);
+      var o=TEAMS[m.opp]; var ock=metric==="sot"?"a_sot":"a_ts";
+      var avgAll=mean(arr)||LEAGUE_AVG;
+      var oc=o?mean(o.matches.map(function(x){return x[ock];})):avgAll;
+      var exp=attack*(0.5+0.5*(oc/(avgAll||LEAGUE_AVG)))*1.12; var sd=Math.max(std(s2),metric==="sot"?1.0:1.7);
       var rc=reco(exp,sd); var line=rc.line; var over=rc.side==="over";
-      rows.push({date:m.date,match:fr(n)+" - "+fr(m.opp),lbl:(over?"OVER ":"UNDER ")+frn(line),pred:r1(exp),real:m.ts,thr:line,over:over});
+      rows.push({date:m.date,name:n,opp:m.opp,match:fr(n)+" - "+fr(m.opp),lbl:(over?"OVER ":"UNDER ")+frn(line)+" "+unit,pred:r1(exp),real:real,thr:line,over:over});
     });
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
-  rows=rows.slice(0,40);
+  rows=rows.slice(0,60);
   var bet=0,err=0;
-  $("#bt tbody")&&0;
   document.querySelector("#bt tbody").innerHTML=rows.map(function(r){
     var ao=r.real>r.thr, ok=r.over===ao; if(ok)bet++; err+=Math.abs(r.real-r.pred);
-    return '<tr><td class="small muted">'+r.date.slice(5)+'</td><td>'+r.match+'</td><td><span class="pill '+(r.over?"W":"L")+'">'+r.lbl+'</span></td><td class="num"><b>'+r.pred+'</b></td><td class="num">'+r.real+'</td><td><span class="pill '+(ok?"W":"L")+'">'+(ok?"gagné":"perdu")+'</span></td></tr>';
-  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Pas encore assez de données.</td></tr>';
+    return '<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+'</td><td>'+r.match+'</td><td><span class="pill '+(r.over?"W":"L")+'">'+r.lbl+'</span></td><td class="num"><b>'+r.pred+'</b></td><td class="num">'+r.real+'</td><td><span class="pill '+(ok?"W":"L")+'">'+(ok?"gagné":"perdu")+'</span></td></tr>';
+  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Pas encore assez de données pour ce filtre.</td></tr>';
   var n=rows.length||1;
   $("scoreCards").innerHTML='<div class="card g"><div class="v">'+(rows.length?Math.round(bet/n*100)+"%":"—")+'</div><div class="k">Paris corrects</div></div>'+
-    '<div class="card w"><div class="v">'+(rows.length?(err/n).toFixed(1):"—")+'</div><div class="k">Erreur moyenne (tirs)</div></div>'+
+    '<div class="card w"><div class="v">'+(rows.length?(err/n).toFixed(1):"—")+'</div><div class="k">Erreur moyenne ('+unit+')</div></div>'+
     '<div class="card"><div class="v">'+rows.length+'</div><div class="k">Matchs testés</div></div>';
+  document.querySelectorAll("#bt tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(tr.dataset.n,tr.dataset.d,tr.dataset.o);});});
 }
 
-// ---- init ----
 function fillFilters(){
   var comps=(typeof COMPS!=="undefined"&&COMPS.length)?COMPS:[];
-  $("fcomp").innerHTML='<option value="all">Toutes compétitions</option>'+comps.map(function(c){return '<option>'+c+'</option>';}).join("");
+  var copt='<option value="all">Toutes compétitions</option>'+comps.map(function(c){return '<option>'+c+'</option>';}).join("");
+  $("fcomp").innerHTML=copt;
   var seasons={};Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){if(m.season)seasons[m.season]=1;});});
   var sl=Object.keys(seasons).sort().reverse();
-  $("fseason").innerHTML='<option value="all">Toutes</option>'+sl.map(function(s){return '<option>'+s+'</option>';}).join("");
+  var sopt='<option value="all">Toutes</option>'+sl.map(function(s){return '<option>'+s+'</option>';}).join("");
+  $("fseason").innerHTML=sopt;
+  var tnames=Object.keys(TEAMS).sort(function(a,b){return fr(a).localeCompare(fr(b));});
+  $("btTeam").innerHTML='<option value="all">Toutes les équipes</option>'+tnames.map(function(n){return '<option value="'+esc(n)+'">'+fr(n)+'</option>';}).join("");
+  $("btComp").innerHTML=copt;
+  $("btSeason").innerHTML='<option value="all">Toutes</option>'+sl.map(function(s){return '<option>'+s+'</option>';}).join("");
 }
 function fillTeamSelects(){
   var names=Object.keys(TEAMS).sort(function(a,b){return fr(a).localeCompare(fr(b));});
-  var opt=names.map(function(n){return '<option value="'+n.replace(/"/g,"&quot;")+'">'+fr(n)+'</option>';}).join("");
+  var opt=names.map(function(n){return '<option value="'+esc(n)+'">'+fr(n)+'</option>';}).join("");
   $("home").innerHTML=opt; $("away").innerHTML=opt;
   if(names[1]){$("away").value=names[1];}
   $("comp").innerHTML=CORDER.map(function(k){return '<option value="'+k+'">'+C[k].l+'</option>';}).join("");
@@ -325,7 +420,7 @@ function buildUpcoming(){
   });});
   list.sort(function(a,b){return a.date<b.date?-1:1;});
   document.querySelector("#up tbody").innerHTML=list.slice(0,100).map(function(m){
-    return '<tr class="click" data-h="'+m.home.replace(/"/g,"&quot;")+'" data-a="'+m.away.replace(/"/g,"&quot;")+'"><td class="small muted">'+m.date.slice(8,10)+'/'+m.date.slice(5,7)+'</td><td>'+fr(m.home)+' <span class="muted">vs</span> '+fr(m.away)+'</td><td class="compTag">'+m.comp+'</td><td><span class="back">analyser &rsaquo;</span></td></tr>';
+    return '<tr class="click" data-h="'+esc(m.home)+'" data-a="'+esc(m.away)+'"><td class="small muted">'+dm(m.date)+'</td><td>'+fr(m.home)+' <span class="muted">vs</span> '+fr(m.away)+'</td><td class="compTag">'+m.comp+'</td><td><span class="back">analyser &rsaquo;</span></td></tr>';
   }).join("")||'<tr><td colspan="4" class="muted" style="text-align:center;padding:18px">Pas encore de matchs à venir collectés — la base se remplit automatiquement.</td></tr>';
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
@@ -337,14 +432,20 @@ window.addEventListener("DOMContentLoaded",function(){
   }
   Object.keys(TEAMS).forEach(function(n){if(!TEAMS[n]||!Array.isArray(TEAMS[n].matches)||!TEAMS[n].matches.length)delete TEAMS[n];});
   if(!Object.keys(TEAMS).length){$("dataInfo").className="err";$("dataInfo").innerHTML="Données en cours de constitution par le collecteur automatique. Reviens d'ici quelques heures.";return;}
+  Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){
+    if(m.sog==null||m.sog===0){m.sog=Math.max(0,(m.ts||0)-(m.sot||0)-(m.blk||0));}
+    if(m.o&&(m.o.sog==null||m.o.sog===0)){m.o.sog=Math.max(0,(m.o.ts||0)-(m.o.sot||0)-(m.o.blk||0));}
+  });});
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
   fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest();
   $("q").addEventListener("input",renderTeamList);
   $("fcomp").addEventListener("change",renderTeamList);
   $("fseason").addEventListener("change",renderTeamList);
+  ["btTeam","btComp","btSeason","btMetric"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
+  $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});
 });
 </script>
 </body>
