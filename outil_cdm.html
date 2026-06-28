@@ -106,7 +106,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Coupe du Monde — <span class="em">tirs</span>, <span class="em">tirs cadrés</span> & <span style="color:#c08bff">xG</span></h1>
+    <h1>Football — <span class="em">tirs</span>, <span class="em">tirs cadrés</span> & <span style="color:#c08bff">xG</span></h1>
     <p class="sub">Données réelles via API-Football · le moteur raisonne avec la qualité des occasions (xG)</p>
     <div class="banner" id="dataInfo">Chargement des données…</div>
   </header>
@@ -173,11 +173,18 @@
 <script src="donnees_cdm.js"></script>
 <script>
 var C = {
-  wc:{label:"Coupe du Monde 2026",mult:1.02,note:"Phase finale (groupes puis élimination directe). On se fie aux matchs récents du tournoi contre des adversaires de niveau équivalent, pas aux éditions anciennes."},
-  amN:{label:"Match amical (sélection)",mult:0.92,note:"Intensité réduite, test tactique."}
+  champ:{label:"Championnat",mult:1.00,note:"Match de championnat — référence principale."},
+  ucl:{label:"Ligue des Champions",mult:1.03,note:"Élite européenne — en élimination directe, matchs plus prudents."},
+  uel:{label:"Ligue Europa",mult:1.00,note:"Coupe d'Europe — niveau variable selon le tour."},
+  uecl:{label:"Ligue Conférence",mult:0.98,note:"3e coupe d'Europe — adversaires plus faibles, volume élevé."},
+  coupe:{label:"Coupe nationale",mult:0.97,note:"Coupe nationale — rotation possible selon le tour."},
+  wc:{label:"Coupe du Monde",mult:1.02,note:"Phase finale — matchs plus fermés. On se fie aux matchs récents contre adversaires équivalents."},
+  euro:{label:"Euro",mult:1.02,note:"Phase finale continentale — élimination directe."},
+  copa:{label:"Copa América",mult:1.02,note:"Phase finale CONMEBOL — élimination directe."},
+  nl:{label:"Ligue des Nations",mult:1.00,note:"Poules — adversaires de niveau proche."},
+  amical:{label:"Match amical",mult:0.92,note:"Intensité réduite, test tactique."}
 };
-var CATALOG = {nation_uefa:["wc","amN"],nation_conmebol:["wc","amN"],nation_caf:["wc","amN"],
-  nation_concacaf:["wc","amN"],nation_afc:["wc","amN"]};
+var COMP_ORDER = ["champ","ucl","uel","uecl","coupe","wc","euro","copa","nl","amical"];
 if(typeof LEAGUE_AVG==="undefined") var LEAGUE_AVG=12.8;
 var XG_REF=0.11;
 
@@ -206,6 +213,7 @@ function reco(mu,sd){
 
 function predict(focusName, oppName, isHome, compKey, ctx){
   var f=TEAMS[focusName], o=TEAMS[oppName];
+  if(!f||!o||!f.sf||!f.sf.length||!o.cd||!o.cd.length){return {noData:true,focusName:focusName,oppName:oppName,isHome:isHome};}
   var form5=mean(f.sf.slice(0,5)), form10=mean(f.sf);
   var attack=0.6*form5+0.4*form10;
   var oppConceded=o.cd.length?mean(o.cd):LEAGUE_AVG;
@@ -274,6 +282,7 @@ function renderMedia(){
 function renderHeadline(){
   var Rh=STATE.R[0], Ra=STATE.R[1];
   function card(R,idx,loc){
+    if(R.noData) return '<div class="teamcard '+(STATE.active===idx?"active":"")+'" data-idx="'+idx+'" style="opacity:.75"><div class="nm">'+R.focusName+' <span class="loc">'+loc+'</span></div><div class="vals"><div class="v"><div class="n">—</div><div class="l">données insuffisantes</div></div></div></div>';
     var xgCell=R.hasXg?'<div class="v"><div class="n x">'+R.xgMean+'</div><div class="l">xG</div></div>':'';
     return '<div class="teamcard '+(STATE.active===idx?"active":"")+'" data-idx="'+idx+'"><div class="seeMore">'+(STATE.active===idx?"analysé":"voir le détail")+'</div>'+
       '<div class="nm">'+R.focusName+' <span class="loc">'+loc+'</span></div><div class="vals">'+
@@ -284,6 +293,7 @@ function renderHeadline(){
 }
 function renderDetail(){
   var R=STATE.R[STATE.active], ctx=STATE.ctx, comp=C[STATE.comp]||{label:"",note:""};
+  if(R.noData) return '<div class="compNote">Données insuffisantes pour <b>'+R.focusName+'</b> — pas encore assez de matchs collectés pour cette équipe. La base se remplit automatiquement chaque jour ; reviens dans quelques jours.</div>';
   var trend=R.form5>R.form10+0.4?"en hausse":(R.form5<R.form10-0.4?"en baisse":"stable");
   var defWord=R.defFactor<0.78?"forte (étouffe les tirs)":(R.defFactor<0.95?"correcte":"perméable");
   var reg=R.cv<0.13?["Très régulière","var(--good)"]:(R.cv<0.20?["Régulière","var(--accent2)"]:["Irrégulière","var(--warn)"]);
@@ -344,7 +354,7 @@ function chipGroups(){document.querySelectorAll(".chips").forEach(function(g){g.
 function setChip(group,val){document.querySelectorAll("#"+group+" .chip").forEach(function(c){if(c.dataset.v===val)c.classList.add("on");else c.classList.remove("on");});}
 function getCtx(){return {meteo:document.querySelector("#meteo .chip.on").dataset.v,repos:document.querySelector("#repos .chip.on").dataset.v,effectif:document.querySelector("#effectif .chip.on").dataset.v};}
 function teamOptions(){var names=Object.keys(TEAMS).sort();return '<optgroup label="Équipes">'+names.map(function(n){return '<option>'+n+'</option>';}).join("")+'</optgroup>';}
-function fillComp(){var cat=TEAMS[$("home").value].cat;var list=CATALOG[cat]||["wc","amN"];$("comp").innerHTML=list.map(function(k){return '<option value="'+k+'">'+C[k].label+'</option>';}).join("");}
+function fillComp(){$("comp").innerHTML=COMP_ORDER.map(function(k){return '<option value="'+k+'">'+C[k].label+'</option>';}).join("");}
 function syncAway(){$("away").innerHTML=teamOptions();if($("away").value===$("home").value){var opts=[].slice.call($("away").options).map(function(o){return o.value;}).filter(function(v){return v!==$("home").value;});if(opts.length)$("away").value=opts[0];}}
 function fillSelects(){var names=Object.keys(TEAMS).sort();$("home").innerHTML=teamOptions();$("home").value=names[0];syncAway();$("away").value=names[1]||names[0];fillComp();$("home").onchange=function(){syncAway();fillComp();};}
 function runAnalyse(){if($("home").value===$("away").value)return;STATE.comp=$("comp").value;STATE.ctx=getCtx();
