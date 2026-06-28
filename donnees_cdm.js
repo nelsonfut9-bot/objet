@@ -1,7 +1,6 @@
-// Genere par collecteur_cdm.py — ne pas editer a la main.
-// Source : API-Football, Coupe du Monde 2022 (avec xG).
-// Mise a jour : 28/06/2026 04:55
-var LEAGUE_AVG = 8.8;
+// Genere automatiquement (GitHub Actions) — ne pas editer.
+// Source : API-Football. Mise a jour : 28/06/2026 04:24 UTC
+var LEAGUE_AVG = 9.4;
 var TEAMS = {
  "Qatar": {
   "type": "nation",
@@ -198,11 +197,21 @@ var TEAMS = {
  "Argentina": {
   "type": "nation",
   "cat": "nation_conmebol",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   15
+  ],
+  "sot": [
+   6
+  ],
+  "cd": [
+   3
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -212,11 +221,21 @@ var TEAMS = {
  "Saudi Arabia": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   3
+  ],
+  "sot": [
+   2
+  ],
+  "cd": [
+   15
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -226,11 +245,21 @@ var TEAMS = {
  "Denmark": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   11
+  ],
+  "sot": [
+   5
+  ],
+  "cd": [
+   13
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -240,11 +269,21 @@ var TEAMS = {
  "Tunisia": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   13
+  ],
+  "sot": [
+   1
+  ],
+  "cd": [
+   11
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -254,11 +293,21 @@ var TEAMS = {
  "Mexico": {
   "type": "nation",
   "cat": "nation_concacaf",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   11
+  ],
+  "sot": [
+   4
+  ],
+  "cd": [
+   6
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -268,11 +317,21 @@ var TEAMS = {
  "Poland": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   6
+  ],
+  "sot": [
+   2
+  ],
+  "cd": [
+   11
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -282,11 +341,21 @@ var TEAMS = {
  "France": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   23
+  ],
+  "sot": [
+   7
+  ],
+  "cd": [
+   4
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -296,11 +365,21 @@ var TEAMS = {
  "Australia": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   4
+  ],
+  "sot": [
+   1
+  ],
+  "cd": [
+   23
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -310,11 +389,21 @@ var TEAMS = {
  "Morocco": {
   "type": "nation",
   "cat": "nation_caf",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   8
+  ],
+  "sot": [
+   2
+  ],
+  "cd": [
+   5
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
@@ -324,11 +413,21 @@ var TEAMS = {
  "Croatia": {
   "type": "nation",
   "cat": "nation_uefa",
-  "sf": [],
-  "sot": [],
-  "cd": [],
-  "xgf": [],
-  "xga": [],
+  "sf": [
+   5
+  ],
+  "sot": [
+   2
+  ],
+  "cd": [
+   8
+  ],
+  "xgf": [
+   null
+  ],
+  "xga": [
+   null
+  ],
   "pos": 50,
   "style": "-",
   "press": "-",
