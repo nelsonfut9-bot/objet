@@ -11,7 +11,7 @@ import json, os, sys, time, math, datetime
 API_KEY  = os.environ.get("API_FOOTBALL_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
 OUTPUT   = "donnees_cdm.js"; PROGRESS="progress.json"; MATCHES="matches.json"
-SAFETY_MARGIN=60; MAX_RUN=7000; MAX_PER_TEAM=40; SLEEP=0.15
+SAFETY_MARGIN=60; MAX_RUN=40000; MAX_PER_TEAM=80; SLEEP=0.10
 WC_LEAGUE=1; WC_SEASON=2026; PRIORITY_SEASONS=[2020,2021,2022,2023,2024,2025,2026]
 
 COMPETITIONS=[
