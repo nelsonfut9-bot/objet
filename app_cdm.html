@@ -69,6 +69,7 @@
   .card.g .v{color:var(--good)}.card.w .v{color:var(--warn)}
   .filterbar{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 8px}
   .filterbar .field{min-width:130px}
+  /* match detail modal */
   .modal{position:fixed;inset:0;background:rgba(6,12,20,.86);z-index:60;overflow:auto;padding:18px}
   .modal .box{max-width:680px;margin:10px auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
   .mclose{float:right;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;font-weight:800;padding:0 4px}
@@ -83,6 +84,9 @@
   .cbar i{display:block;height:100%} .cbar i.l{background:var(--good)} .cbar i.r{background:var(--accent2)}
   .legend{display:flex;justify-content:center;gap:18px;font-size:12px;color:var(--muted);margin:2px 0 6px}
   .legend b{font-weight:800}.legend .lg{color:var(--good)}.legend .rg{color:var(--accent2)}
+  .prebox{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13px;margin-bottom:8px}
+  .prebox .ln{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0}
+  textarea{width:100%;min-height:90px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;line-height:1.5}
 </style>
 </head>
 <body>
@@ -129,12 +133,19 @@
       <button class="tab" style="margin-top:12px;background:var(--accent);color:#06281f;border-color:var(--accent)" id="go">Analyser le match</button>
     </div>
     <div class="panel hidden" id="result"></div>
+    <div class="panel" id="oddsPanel">
+      <div class="secTitle" style="margin-top:0">Ligne d'équilibre via les cotes (la « stat à l'équilibre »)</div>
+      <p class="small muted">Colle les cotes d'un bookmaker (Betclic, Winamax…) pour une équipe, une ligne par seuil au format <b>seuil over under</b>. Je calcule la ligne d'équilibre du marché (là où over/under ≈ 50/50) — le vrai repère à comparer à mon estimation.</p>
+      <textarea id="oddInput" placeholder="7.5 1.35 2.65&#10;9.5 1.95 1.68&#10;11.5 2.95 1.27"></textarea>
+      <button class="tab" style="margin-top:10px;background:var(--accent);color:#06281f;border-color:var(--accent)" id="oddGo">Calculer la ligne d'équilibre</button>
+      <div id="oddOut" style="margin-top:10px"></div>
+    </div>
   </section>
 
   <section id="suivi" class="hidden">
     <div class="panel">
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
-      <p class="small muted">Prédiction d'avant-match honnête sur les matchs déjà joués (la perf du jour est retirée des moyennes). Cliquez une ligne pour voir le détail du match.</p>
+      <p class="small muted">Backtest 100% honnête : pour chaque match, l'estimation n'utilise QUE les matchs joués AVANT cette date — jamais le match lui-même, jamais les matchs postérieurs. Comme si je n'avais pas vu le résultat. Cliquez une ligne pour voir le détail et la prédiction d'avant-match.</p>
       <div class="filterbar">
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
@@ -182,6 +193,7 @@ if(typeof LEAGUE_AVG==="undefined")var LEAGUE_AVG=12.5;
 if(typeof COMPS==="undefined")var COMPS=[];
 var $=function(id){return document.getElementById(id);};
 
+// stats affichées dans le détail de match (clé, libellé, décimales)
 var DETAIL_STATS=[["poss","Possession %",0],["xg","Buts attendus (xG)",2],["ts","Total des tirs",0],
   ["sot","Tirs cadrés",0],["sog","Tirs non cadrés",0],["sib","Tirs dans la surface",0],
   ["sob","Tirs hors surface",0],["blk","Tirs bloqués",0],["cor","Corners",0],
@@ -191,6 +203,7 @@ var DETAIL_STATS=[["poss","Possession %",0],["xg","Buts attendus (xG)",2],["ts",
 
 var curTeam=null;
 
+// ---- filtrage des matchs d'une equipe ----
 function teamMatches(name,comp,season){
   var t=TEAMS[name]; if(!t)return [];
   return t.matches.filter(function(m){
@@ -202,6 +215,7 @@ function teamMatches(name,comp,season){
 function teamComps(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.comp)s[m.comp]=1;});return Object.keys(s).sort();}
 function teamSeasons(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.season)s[m.season]=1;});return Object.keys(s).sort().reverse();}
 
+// ---- liste d'equipes ----
 function renderTeamList(){
   var q=($("q").value||"").toLowerCase(), comp=$("fcomp").value, season=$("fseason").value;
   var names=Object.keys(TEAMS).filter(function(n){
@@ -216,6 +230,7 @@ function renderTeamList(){
   document.querySelectorAll("#teamlist .titem").forEach(function(el){el.addEventListener("click",function(){showTeam(el.dataset.t,"all","all");});});
 }
 
+// ---- fiche equipe ----
 function avg(ms,k){return ms.length?r1(mean(ms.map(function(m){return m[k];}))):"—";}
 function showTeam(name,comp,season){
   curTeam=name; comp=comp||"all"; season=season||"all";
@@ -276,6 +291,7 @@ function showTeam(name,comp,season){
   $("teampage").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+// ---- detail d'un match (style comparatif) ----
 function findRec(name,date,opp){var t=TEAMS[name];if(!t)return null;for(var i=0;i<t.matches.length;i++){var m=t.matches[i];if(m.date===date&&m.opp===opp)return m;}return null;}
 function oppVal(me,orec,k){
   if(orec&&orec[k]!=null)return orec[k];
@@ -291,6 +307,49 @@ function statBar(lab,lv,rv,dec){
   return '<div class="srow"><span>'+lt+'</span><span class="lab">'+lab+'</span><span>'+rt+'</span></div>'+
     '<div class="cbar"><i class="l" style="width:'+lp+'%"></i><i class="r" style="width:'+rp+'%"></i></div>';
 }
+// prediction d'avant-match : utilise UNIQUEMENT les matchs joues AVANT cette date (zero lookahead)
+function predictAt(name,opp,isHome,date){
+  var t=TEAMS[name], o=TEAMS[opp];
+  if(!t)return null;
+  var past=t.matches.filter(function(m){return m.date<date;});
+  if(past.length<3)return null;
+  var sf=past.map(function(m){return m.ts;}), sot=past.map(function(m){return m.sot;});
+  var form5=mean(sf.slice(0,5)), form10=mean(sf.slice(0,10)), attack=0.6*form5+0.4*form10;
+  var opast=o?o.matches.filter(function(m){return m.date<date;}):[];
+  var oc=opast.length?mean(opast.map(function(m){return m.a_ts;})):LEAGUE_AVG;
+  var defF=oc/LEAGUE_AVG;
+  var exp=attack*(0.5+0.5*defF)*(isHome?1.12:0.96);
+  var sd=Math.max(std(sf),1.7);
+  var sotRatio=mean(sf)?mean(sot)/mean(sf):0.35;
+  var expSot=exp*sotRatio*(0.96+0.08*defF);
+  var sdSot=Math.max(std(sot)*0.9,1.0);
+  return {exp:exp,sd:sd,expSot:expSot,sdSot:sdSot,recoShots:reco(exp,sd),recoSot:reco(expSot,sdSot),n:past.length};
+}
+function preLine(label,exp,rc,real){
+  var ov=rc.side==="over"; var hit=(real>rc.line)===ov;
+  return '<div class="ln"><span>'+label+' estimés : <b>'+r1(exp)+'</b> — conseil <b>'+(ov?"OVER":"UNDER")+' '+frn(rc.line)+'</b></span>'+
+    '<span>réel '+real+' '+(hit?'<span class="pill W">✓ gagné</span>':'<span class="pill L">✗ perdu</span>')+'</span></div>';
+}
+// ligne d'equilibre du marche a partir des cotes
+function impliedOver(oo,uu){var io=1/oo,iu=1/uu;return io/(io+iu);}
+function computeOdds(){
+  var txt=$("oddInput").value||"";
+  var rows=[];
+  txt.split(/\n+/).forEach(function(li){
+    var p=li.trim().split(/[\s,;]+/).map(function(x){return parseFloat(x.replace(",","."));});
+    if(p.length>=3&&!isNaN(p[0])&&!isNaN(p[1])&&!isNaN(p[2])){rows.push({L:p[0],p:impliedOver(p[1],p[2])});}
+  });
+  if(rows.length<2){$("oddOut").innerHTML='<div class="err">Donne au moins 2 lignes au format : seuil over under (ex: 9.5 1.95 1.68).</div>';return;}
+  rows.sort(function(a,b){return a.L-b.L;});
+  var bl=null;
+  for(var i=0;i<rows.length-1;i++){var a=rows[i],b=rows[i+1];if(a.p>=0.5&&b.p<=0.5){var tt=(a.p-0.5)/(a.p-b.p);bl=a.L+tt*(b.L-a.L);break;}}
+  var detail=rows.map(function(r){return '<div class="ln"><span>seuil '+frn(r.L)+'</span><span>probabilité OVER ≈ <b>'+Math.round(r.p*100)+'%</b></span></div>';}).join("");
+  var out='<div class="prebox">'+detail+'</div>';
+  if(bl==null){out+='<div class="small muted">Les lignes fournies n encadrent pas le 50/50 — ajoute une ligne plus haute (ou plus basse) pour situer l équilibre.</div>';}
+  else{out+='<div class="reco"><div class="side">≈ '+frn(r1(bl))+'</div><div class="small muted">ligne d équilibre du marché (50/50)</div><div class="pill2">~'+r1(bl)+' attendus</div></div>'+
+    '<div class="small muted">Le marché attend environ <b>'+r1(bl)+'</b>. Compare à « Tirs estimés » de mon analyse : si mon estimation est nettement au-dessus, la valeur penche OVER autour de cette ligne ; nettement en dessous, UNDER.</div>';}
+  $("oddOut").innerHTML=out;
+}
 function openMatch(name,date,opp){
   var me=findRec(name,date,opp); if(!me){return;}
   var orec=findRec(opp,date,name);
@@ -298,18 +357,21 @@ function openMatch(name,date,opp){
   var lieu=me.home?"":" (extérieur)";
   var bars=DETAIL_STATS.map(function(s){return statBar(s[1],me[s[0]]==null?null:me[s[0]],oppVal(me,orec,s[0]),s[2]);}).join("");
   var note=orec?"":'<div class="small muted" style="text-align:center;margin-top:10px">Stats adverses partielles (l’équipe adverse n’est pas dans la base détaillée).</div>';
+  var pm=predictAt(name,opp,me.home,date), pmHTML="";
+  if(pm){pmHTML='<div class="secTitle" style="margin-top:6px">Ma prédiction d avant-match (sans avoir vu ce match)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Calculée uniquement avec les '+pm.n+' matchs de '+fr(name)+' joués AVANT le '+dmy(date)+'.</div>'+preLine("Tirs",pm.exp,pm.recoShots,me.ts)+preLine("Tirs cadrés",pm.expSot,pm.recoSot,me.sot)+'</div>';}
   $("modal").innerHTML='<div class="box"><span class="mclose" id="mClose">×</span>'+
     '<div class="mmeta" style="margin-bottom:4px">'+compLabel+saison+' · '+dmy(date)+lieu+'</div>'+
     '<div class="mh"><div class="tm" style="text-align:right">'+fr(name)+'</div>'+
       '<div class="sc">'+me.gf+' – '+me.ga+'</div>'+
       '<div class="tm" style="text-align:left">'+fr(opp)+'</div></div>'+
     '<div class="legend"><span class="lg">■ <b>'+fr(name)+'</b></span><span class="rg">■ <b>'+fr(opp)+'</b></span></div>'+
-    bars+note+'</div>';
+    pmHTML+bars+note+'</div>';
   $("modal").classList.remove("hidden");
   $("mClose").addEventListener("click",closeModal);
 }
 function closeModal(){$("modal").classList.add("hidden");$("modal").innerHTML="";}
 
+// ---- prediction ----
 function predict(name,opp,isHome,compKey){
   var t=TEAMS[name], o=TEAMS[opp];
   var ms=t?t.matches:[], os=o?o.matches:[];
@@ -355,6 +417,7 @@ function runAnalyse(){
       '<li>'+fr(R.name)+' joue à domicile (+12% de volume).</li></ul>';
 }
 
+// ---- backtest ----
 function buildBacktest(){
   var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value;
   var unit=metric==="sot"?"tirs cadrés":"tirs";
@@ -365,16 +428,11 @@ function buildBacktest(){
       if(!m.home)return;
       if(fComp&&fComp!=="all"&&m.comp!==fComp)return;
       if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
-      var arr=TEAMS[n].matches.map(function(x){return x[metric];});
+      var pm=predictAt(n,m.opp,true,m.date); if(!pm)return;
       var real=m[metric];
-      var i=TEAMS[n].matches.indexOf(m); var s2=arr.slice(); if(i>=0)s2.splice(i,1);
-      if(s2.length<3)return;
-      var attack=0.6*mean(s2.slice(0,5))+0.4*mean(s2.slice(0,10));
-      var o=TEAMS[m.opp]; var ock=metric==="sot"?"a_sot":"a_ts";
-      var avgAll=mean(arr)||LEAGUE_AVG;
-      var oc=o?mean(o.matches.map(function(x){return x[ock];})):avgAll;
-      var exp=attack*(0.5+0.5*(oc/(avgAll||LEAGUE_AVG)))*1.12; var sd=Math.max(std(s2),metric==="sot"?1.0:1.7);
-      var rc=reco(exp,sd); var line=rc.line; var over=rc.side==="over";
+      var rc=metric==="sot"?pm.recoSot:pm.recoShots;
+      var exp=metric==="sot"?pm.expSot:pm.exp;
+      var line=rc.line, over=rc.side==="over";
       rows.push({date:m.date,name:n,opp:m.opp,match:fr(n)+" - "+fr(m.opp),lbl:(over?"OVER ":"UNDER ")+frn(line)+" "+unit,pred:r1(exp),real:real,thr:line,over:over});
     });
   });
@@ -392,6 +450,7 @@ function buildBacktest(){
   document.querySelectorAll("#bt tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(tr.dataset.n,tr.dataset.d,tr.dataset.o);});});
 }
 
+// ---- init ----
 function fillFilters(){
   var comps=(typeof COMPS!=="undefined"&&COMPS.length)?COMPS:[];
   var copt='<option value="all">Toutes compétitions</option>'+comps.map(function(c){return '<option>'+c+'</option>';}).join("");
@@ -400,6 +459,7 @@ function fillFilters(){
   var sl=Object.keys(seasons).sort().reverse();
   var sopt='<option value="all">Toutes</option>'+sl.map(function(s){return '<option>'+s+'</option>';}).join("");
   $("fseason").innerHTML=sopt;
+  // filtres backtest
   var tnames=Object.keys(TEAMS).sort(function(a,b){return fr(a).localeCompare(fr(b));});
   $("btTeam").innerHTML='<option value="all">Toutes les équipes</option>'+tnames.map(function(n){return '<option value="'+esc(n)+'">'+fr(n)+'</option>';}).join("");
   $("btComp").innerHTML=copt;
@@ -432,6 +492,7 @@ window.addEventListener("DOMContentLoaded",function(){
   }
   Object.keys(TEAMS).forEach(function(n){if(!TEAMS[n]||!Array.isArray(TEAMS[n].matches)||!TEAMS[n].matches.length)delete TEAMS[n];});
   if(!Object.keys(TEAMS).length){$("dataInfo").className="err";$("dataInfo").innerHTML="Données en cours de constitution par le collecteur automatique. Reviens d'ici quelques heures.";return;}
+  // dérive les tirs non cadrés si absents (tirs - cadrés - bloqués)
   Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){
     if(m.sog==null||m.sog===0){m.sog=Math.max(0,(m.ts||0)-(m.sot||0)-(m.blk||0));}
     if(m.o&&(m.o.sog==null||m.o.sog===0)){m.o.sog=Math.max(0,(m.o.ts||0)-(m.o.sot||0)-(m.o.blk||0));}
@@ -445,6 +506,7 @@ window.addEventListener("DOMContentLoaded",function(){
   ["btTeam","btComp","btSeason","btMetric"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
+  $("oddGo").addEventListener("click",computeOdds);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});
 });
 </script>
