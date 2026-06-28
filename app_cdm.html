@@ -75,6 +75,7 @@
   </header>
   <div class="tabs">
     <div class="tab active" data-tab="equipes">Équipes</div>
+    <div class="tab" data-tab="avenir">Matchs à venir</div>
     <div class="tab" data-tab="analyse">Analyse d'un match</div>
     <div class="tab" data-tab="suivi">Suivi & fiabilité</div>
   </div>
@@ -89,6 +90,14 @@
       <div class="teamlist" id="teamlist"></div>
     </div>
     <div class="panel hidden" id="teampage"></div>
+  </section>
+
+  <section id="avenir" class="hidden">
+    <div class="panel">
+      <div class="secTitle" style="margin-top:0">Prochains matchs</div>
+      <p class="small muted">Cliquez un match pour l'analyser. La liste se remplit au fil de la collecte automatique.</p>
+      <table id="up"><thead><tr><th>Date</th><th>Match</th><th>Compétition</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
   </section>
 
   <section id="analyse" class="hidden">
@@ -308,7 +317,20 @@ function fillTeamSelects(){
   if(names[1]){$("away").value=names[1];}
   $("comp").innerHTML=CORDER.map(function(k){return '<option value="'+k+'">'+C[k].l+'</option>';}).join("");
 }
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","analyse","suivi"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+function buildUpcoming(){
+  var seen={},list=[];
+  Object.keys(TEAMS).forEach(function(n){(TEAMS[n].upcoming||[]).forEach(function(u){
+    var home=u.home?n:u.opp, away=u.home?u.opp:n, key=u.date+"|"+home+"|"+away;
+    if(seen[key])return; seen[key]=1; list.push({date:u.date,home:home,away:away,comp:u.comp});
+  });});
+  list.sort(function(a,b){return a.date<b.date?-1:1;});
+  document.querySelector("#up tbody").innerHTML=list.slice(0,100).map(function(m){
+    return '<tr class="click" data-h="'+m.home.replace(/"/g,"&quot;")+'" data-a="'+m.away.replace(/"/g,"&quot;")+'"><td class="small muted">'+m.date.slice(8,10)+'/'+m.date.slice(5,7)+'</td><td>'+fr(m.home)+' <span class="muted">vs</span> '+fr(m.away)+'</td><td class="compTag">'+m.comp+'</td><td><span class="back">analyser &rsaquo;</span></td></tr>';
+  }).join("")||'<tr><td colspan="4" class="muted" style="text-align:center;padding:18px">Pas encore de matchs à venir collectés — la base se remplit automatiquement.</td></tr>';
+  document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
+}
+function loadMatch(h,a){if(TEAMS[h])$("home").value=h;if(TEAMS[a])$("away").value=a;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","analyse","suivi"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
 window.addEventListener("DOMContentLoaded",function(){
   if(typeof TEAMS==="undefined"||!Object.keys(TEAMS).length){
     $("dataInfo").className="err";$("dataInfo").innerHTML="Aucune donnée pour l'instant. La collecte automatique remplit la base — reviens d'ici quelques heures.";return;
@@ -317,7 +339,7 @@ window.addEventListener("DOMContentLoaded",function(){
   if(!Object.keys(TEAMS).length){$("dataInfo").className="err";$("dataInfo").innerHTML="Données en cours de constitution par le collecteur automatique. Reviens d'ici quelques heures.";return;}
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildBacktest();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest();
   $("q").addEventListener("input",renderTeamList);
   $("fcomp").addEventListener("change",renderTeamList);
   $("fseason").addEventListener("change",renderTeamList);
