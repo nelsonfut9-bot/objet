@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-COLLECTEUR INCREMENTAL (GitHub Actions) — multi-competitions.
-- Balaie 5 ans des 5 grands championnats + coupes nationales + coupes d'Europe
-  + competitions de selections + amicaux.
-- INCREMENTAL : reprend ou il s'est arrete (progress.json + matches.json),
-  ne recharge jamais de zero.
-- QUOTA-AWARE : s'arrete avant d'epuiser le quota quotidien (plan Pro).
-- Agrege tout en donnees_cdm.js (lu par outil_cdm.html).
-La cle API vient du secret GitHub API_FOOTBALL_KEY.
+COLLECTEUR INCREMENTAL — PRIORITE Coupe du Monde, puis backfill large.
+1) Identifie les selections ENCORE EN LICE au Mondial 2026 (presentes dans les
+   matchs a venir / en cours), et recupere EN PRIORITE tous leurs matchs depuis 2020.
+2) Ensuite seulement : 5 ans des 5 grands championnats + coupes + Europe + amicaux.
+Incremental (reprend ou il s'arrete), quota-aware (plan Pro). Cle = secret GitHub.
 """
 import json, os, sys, time, math, datetime
 
@@ -18,12 +15,15 @@ OUTPUT   = "donnees_cdm.js"
 PROGRESS = "progress.json"
 MATCHES  = "matches.json"
 
-SAFETY_MARGIN = 60      # on garde 60 requetes de marge sous le quota du jour
-MAX_RUN       = 7000    # plafond de requetes par execution (securite)
-MAX_PER_TEAM  = 18      # nb de matchs recents gardes par equipe (frontend)
-SLEEP         = 0.15    # pause entre requetes (respect du debit)
+SAFETY_MARGIN = 60
+MAX_RUN       = 7000
+MAX_PER_TEAM  = 18
+SLEEP         = 0.15
 
-# (league_id, libelle, categorie, [saisons])
+WC_LEAGUE = 1
+WC_SEASON = 2026
+PRIORITY_SEASONS = [2020,2021,2022,2023,2024,2025,2026]
+
 COMPETITIONS = [
     (39,  "Premier League",      "club", [2021,2022,2023,2024,2025]),
     (140, "LaLiga",              "club", [2021,2022,2023,2024,2025]),
@@ -44,10 +44,7 @@ COMPETITIONS = [
     (9,   "Copa America",        "nation", [2021,2024]),
     (10,  "Amicaux (selections)","nation", [2022,2023,2024,2025]),
 ]
-COMP_LABEL = {str(c[0]): c[1] for c in COMPETITIONS}
-COMP_CAT   = {str(c[0]): c[2] for c in COMPETITIONS}
 
-# ---------------- maths / moteur ----------------
 def mean(a): return sum(a)/len(a) if a else 0.0
 def std(a):
     if len(a) < 2: return 1.7
@@ -75,10 +72,8 @@ def predict_shots(sf, opp_cd, is_home):
     sd=max(std(sf),1.7)
     return round(exp,1),round(sd,1),reco(exp,sd)
 
-# ---------------- API (quota-aware) ----------------
 class Stop(Exception): pass
-_state_remaining = [None]   # quota quotidien restant (depuis les en-tetes)
-
+_state_remaining = [None]
 def api_get(path, params, used):
     import requests
     if used[0] >= MAX_RUN: raise Stop()
@@ -86,20 +81,13 @@ def api_get(path, params, used):
     used[0]+=1
     rem = r.headers.get("x-ratelimit-requests-remaining")
     if rem is not None:
-        try:
-            _state_remaining[0]=int(rem)
-            if int(rem) <= SAFETY_MARGIN:
-                print("  Quota quotidien presque epuise (", rem, "restantes) -> on s'arrete proprement.")
-                # on traite cette reponse puis on stoppera au prochain tour
+        try: _state_remaining[0]=int(rem)
         except: pass
     if r.status_code==429:
         print("  429 -> quota atteint."); raise Stop()
     r.raise_for_status()
     data=r.json()
     if data.get("errors"): print("  ! API:", data["errors"])
-    if _state_remaining[0] is not None and _state_remaining[0] <= SAFETY_MARGIN:
-        # on a encore traite la reponse courante, mais on ne repart pas
-        pass
     return data.get("response", [])
 
 def can_continue(used):
@@ -107,47 +95,77 @@ def can_continue(used):
     if _state_remaining[0] is not None and _state_remaining[0] <= SAFETY_MARGIN: return False
     return True
 
-# ---------------- persistance ----------------
 def load_json(path, default):
     if os.path.exists(path):
         try: return json.load(open(path, encoding="utf-8"))
         except: return default
     return default
 
-# ---------------- collecte ----------------
+def add_fixtures(resp, matches, pending, league_id, prio):
+    n=0
+    for fx in resp:
+        if fx["fixture"]["status"]["short"]!="FT": continue
+        fid=str(fx["fixture"]["id"])
+        if fid in matches: continue
+        lid = league_id if league_id is not None else str(fx.get("league",{}).get("id",""))
+        pending.append({"fid":fid,"date":fx["fixture"]["date"][:10],
+            "h":fx["teams"]["home"]["name"],"a":fx["teams"]["away"]["name"],
+            "league":str(lid),"prio":prio})
+        n+=1
+    return n
+
 def run():
     if not API_KEY:
         print("ERREUR : secret API_FOOTBALL_KEY manquant."); sys.exit(1)
-    progress = load_json(PROGRESS, {"fixtures_done": {}, "pending_fixtures": []})
-    matches  = load_json(MATCHES, {})   # fid -> {h,a,hs,as,hsot,asot,hxg,axg,date,league,cat}
+    progress = load_json(PROGRESS, {"fixtures_done":{}, "pending_fixtures":[], "priority_teams":{}})
+    progress.setdefault("priority_teams", {})
+    progress.setdefault("fixtures_done", {})
+    progress.setdefault("pending_fixtures", [])
+    matches = load_json(MATCHES, {})
     used=[0]
-    print(datetime.datetime.utcnow().strftime("== Run %d/%m %H:%M UTC =="))
-
-    # 1) Recuperer les calendriers manquants (1 requete par competition-saison)
+    print(datetime.datetime.now(datetime.timezone.utc).strftime("== Run %d/%m %H:%M UTC =="))
     try:
-        for lid, label, cat, seasons in COMPETITIONS:
-            for season in seasons:
-                key=f"{lid}_{season}"
+        # 0) equipes encore en lice
+        if not progress["priority_teams"]:
+            if not can_continue(used): raise Stop()
+            resp=api_get("/fixtures", {"league":WC_LEAGUE,"season":WC_SEASON}, used)
+            allt={}; alive={}
+            live={"NS","TBD","1H","HT","2H","ET","BT","P","SUSP","INT","LIVE"}
+            for fx in resp:
+                for side in ("home","away"):
+                    t=fx["teams"][side]; allt[str(t["id"])]=t["name"]
+                if fx["fixture"]["status"]["short"] in live:
+                    for side in ("home","away"):
+                        t=fx["teams"][side]; alive[str(t["id"])]=t["name"]
+            progress["priority_teams"] = alive if alive else allt
+            print("  Selections prioritaires (en lice):", len(progress["priority_teams"]))
+        # A) calendriers des selections prioritaires (tous matchs depuis 2020)
+        for tid,name in list(progress["priority_teams"].items()):
+            for s in PRIORITY_SEASONS:
+                key=f"T{tid}_{s}"
                 if progress["fixtures_done"].get(key): continue
                 if not can_continue(used): raise Stop()
-                resp=api_get("/fixtures", {"league":lid,"season":season}, used)
-                for fx in resp:
-                    st=fx["fixture"]["status"]["short"]
-                    fid=str(fx["fixture"]["id"])
-                    if st=="FT" and fid not in matches:
-                        progress["pending_fixtures"].append({
-                            "fid":fid,"date":fx["fixture"]["date"][:10],
-                            "h":fx["teams"]["home"]["name"],"a":fx["teams"]["away"]["name"],
-                            "league":str(lid)})
+                resp=api_get("/fixtures", {"team":tid,"season":s}, used)
+                add_fixtures(resp, matches, progress["pending_fixtures"], None, True)
                 progress["fixtures_done"][key]=True
                 time.sleep(SLEEP)
-        # 2) Recuperer les statistiques des matchs en attente
-        # dedoublonnage + ordre chronologique inverse (recents d'abord)
+        # C) calendriers du backfill large (apres priorite)
+        for lid,label,cat,seasons in COMPETITIONS:
+            for s in seasons:
+                key=f"{lid}_{s}"
+                if progress["fixtures_done"].get(key): continue
+                if not can_continue(used): raise Stop()
+                resp=api_get("/fixtures", {"league":lid,"season":s}, used)
+                add_fixtures(resp, matches, progress["pending_fixtures"], str(lid), False)
+                progress["fixtures_done"][key]=True
+                time.sleep(SLEEP)
+        # B) statistiques : prioritaires d'abord, puis recents d'abord
         seen=set(); pend=[]
         for it in progress["pending_fixtures"]:
             if it["fid"] in matches or it["fid"] in seen: continue
             seen.add(it["fid"]); pend.append(it)
-        pend.sort(key=lambda x: x["date"], reverse=True)
+        pend.sort(key=lambda x:x["date"], reverse=True)
+        pend.sort(key=lambda x:0 if x.get("prio") else 1)
         for it in pend:
             if not can_continue(used): raise Stop()
             stats=api_get("/fixtures/statistics", {"fixture":it["fid"]}, used)
@@ -169,20 +187,15 @@ def run():
                 "hxg":fv(h,"expected_goals"),"axg":fv(a,"expected_goals")}
             time.sleep(SLEEP)
     except Stop:
-        print("  Pause (quota/plafond). On reprendra au prochain run.")
-
-    # on retire de pending ce qui est deja recupere
+        print("  Pause (quota/plafond). Reprise au prochain run.")
     progress["pending_fixtures"]=[it for it in progress["pending_fixtures"] if it["fid"] not in matches]
-
     aggregate_and_write(matches)
     json.dump(progress, open(PROGRESS,"w",encoding="utf-8"))
     json.dump(matches,  open(MATCHES,"w",encoding="utf-8"))
-    print(f"  Requetes utilisees: {used[0]} | matchs en base: {len(matches)} | en attente: {len(progress['pending_fixtures'])}")
+    print(f"  Requetes: {used[0]} | matchs en base: {len(matches)} | en attente: {len(progress['pending_fixtures'])}")
 
-# ---------------- agregation -> donnees_cdm.js ----------------
 def aggregate_and_write(matches):
-    # construire l'historique de tirs par equipe (recents d'abord)
-    by_team={}   # name -> list of (date, shots_for, sot_for, shots_against, xg_for, xg_against)
+    by_team={}
     for fid,m in matches.items():
         by_team.setdefault(m["h"],[]).append((m["date"],m["hs"],m["hsot"],m["as"],m["hxg"],m["axg"]))
         by_team.setdefault(m["a"],[]).append((m["date"],m["as"],m["asot"],m["hs"],m["axg"],m["hxg"]))
@@ -194,7 +207,6 @@ def aggregate_and_write(matches):
             "sf":[r[1] for r in rows], "sot":[r[2] for r in rows], "cd":[r[3] for r in rows],
             "xgf":[r[4] for r in rows], "xga":[r[5] for r in rows],
             "pos":50,"style":"-","press":"-","bloc":"-","top":False}
-    # historique de predictions honnetes (sur les 40 matchs les plus recents avec stats)
     HISTORY=[]
     recent=sorted(matches.values(), key=lambda m:m["date"], reverse=True)[:40]
     for m in recent:
@@ -209,8 +221,8 @@ def aggregate_and_write(matches):
                         [round(exp-0.85*sd),round(exp+0.85*sd)], real, rc["prob"]])
     allsf=[v for t in TEAMS.values() for v in t["sf"]]
     la=round(mean(allsf),1) if allsf else LEAGUE_AVG
-    payload=("// Genere automatiquement (GitHub Actions) — base multi-competitions.\n"
-        "// Maj: "+datetime.datetime.utcnow().strftime("%d/%m/%Y %H:%M")+" UTC\n"
+    payload=("// Genere automatiquement (GitHub Actions) — priorite Mondial puis backfill.\n"
+        "// Maj: "+datetime.datetime.now(datetime.timezone.utc).strftime("%d/%m/%Y %H:%M")+" UTC\n"
         "var LEAGUE_AVG = "+json.dumps(la)+";\n"
         "var TEAMS = "+json.dumps(TEAMS, ensure_ascii=False)+";\n"
         "var UPCOMING = [];\n"
