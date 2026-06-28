@@ -282,6 +282,7 @@ function showTeam(name,comp,season){
       S("Fautes",avg(ms,"fouls"))+S("Hors-jeu",avg(ms,"off"))+S("Cartons jaunes",avg(ms,"yc"))+S("Cartons rouges",avg(ms,"rc"))+
     '</div>'+
     (up.length?'<div class="secTitle">Prochains matchs</div><table><tbody>'+upRows+'</tbody></table>':'')+
+    teamBacktest(name,ms)+
     '<div class="secTitle">Tous les matchs ('+ms.length+') — cliquez pour le détail</div><table><thead><tr><th>Date</th><th>Adversaire</th><th class="num">Score</th><th></th><th class="num">Tirs</th><th class="num">Cadrés</th><th></th></tr></thead><tbody>'+matchRows+'</tbody></table>');
   $("teampage").classList.remove("hidden");
   $("backList").addEventListener("click",function(){$("teampage").classList.add("hidden");});
@@ -311,7 +312,7 @@ function statBar(lab,lv,rv,dec){
 function predictAt(name,opp,isHome,date){
   var t=TEAMS[name], o=TEAMS[opp];
   if(!t)return null;
-  var past=t.matches.filter(function(m){return m.date<date;});
+  var past=t.matches.filter(function(m){return m.date<date&&m.ts>0;});
   if(past.length<3)return null;
   var sf=past.map(function(m){return m.ts;}), sot=past.map(function(m){return m.sot;});
   var form5=mean(sf.slice(0,5)), form10=mean(sf.slice(0,10)), attack=0.6*form5+0.4*form10;
@@ -329,6 +330,39 @@ function preLine(label,exp,rc,real){
   var ov=rc.side==="over"; var hit=(real>rc.line)===ov;
   return '<div class="ln"><span>'+label+' estimés : <b>'+r1(exp)+'</b> — conseil <b>'+(ov?"OVER":"UNDER")+' '+frn(rc.line)+'</b></span>'+
     '<span>réel '+real+' '+(hit?'<span class="pill W">✓ gagné</span>':'<span class="pill L">✗ perdu</span>')+'</span></div>';
+}
+// backtest visible des 10 derniers matchs d'une equipe (prediction d'avant-match)
+function teamBacktest(name,ms){
+  var withStats=ms.filter(function(m){return m.ts>0;}).slice(0,10);
+  if(!withStats.length)return "";
+  var nb=0,okT=0,okC=0;
+  var rows=withStats.map(function(m){
+    var pm=predictAt(name,m.opp,m.home,m.date);
+    if(!pm)return '<tr><td class="small muted">'+dm(m.date)+'</td><td>'+(m.home?'':'@ ')+fr(m.opp)+'</td><td colspan="2" class="small muted">historique insuffisant avant cette date</td></tr>';
+    nb++;
+    var rt=pm.recoShots, hs=(m.ts>rt.line)===(rt.side==="over"); if(hs)okT++;
+    var rc=pm.recoSot, hc=(m.sot>rc.line)===(rc.side==="over"); if(hc)okC++;
+    return '<tr class="click" data-d="'+m.date+'" data-o="'+esc(m.opp)+'"><td class="small muted">'+dm(m.date)+'</td><td>'+(m.home?'':'<span class="muted">@</span> ')+fr(m.opp)+'</td>'+
+      '<td class="small">'+(rt.side==="over"?"OVER ":"UNDER ")+frn(rt.line)+' → <b>'+m.ts+'</b> '+(hs?'<span class="pill W">✓</span>':'<span class="pill L">✗</span>')+'</td>'+
+      '<td class="small">'+(rc.side==="over"?"OVER ":"UNDER ")+frn(rc.line)+' → <b>'+m.sot+'</b> '+(hc?'<span class="pill W">✓</span>':'<span class="pill L">✗</span>')+'</td></tr>';
+  }).join("");
+  var bilan=nb?('<div class="small muted" style="margin:4px 0 6px">Sur ces '+nb+' matchs : tirs <b>'+okT+'/'+nb+'</b> ('+Math.round(okT/nb*100)+'%), tirs cadrés <b>'+okC+'/'+nb+'</b> ('+Math.round(okC/nb*100)+'%) corrects.</div>'):'';
+  return '<div class="secTitle">Mon backtest honnête — 10 derniers matchs</div>'+
+    '<div class="small muted" style="margin-bottom:6px">Pour chaque match, l’estimation n’utilise QUE les matchs joués AVANT cette date (jamais le résultat). Cliquez une ligne pour le détail.</div>'+bilan+
+    '<table><thead><tr><th>Date</th><th>Adversaire</th><th>Tirs : mon conseil → réel</th><th>Cadrés : mon conseil → réel</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+// mes cotes equitables (proposees par mon modele) autour de la ligne d'equilibre
+function fairTable(mu,sd){
+  var c=Math.round(mu-0.5)+0.5; var lines=[c-1,c,c+1];
+  var html='<table><thead><tr><th>Seuil</th><th class="num">Ma cote OVER</th><th class="num">Ma cote UNDER</th></tr></thead><tbody>';
+  lines.forEach(function(L){
+    if(L<0.5)return;
+    var po=1-normCdf(L,mu,sd), pu=1-po;
+    var fo=po>0.02?(1/po):50, fu=pu>0.02?(1/pu):50;
+    var eq=(L===c)?' style="background:rgba(39,212,154,.10)"':'';
+    html+='<tr'+eq+'><td>'+frn(L)+(L===c?' <span class="compTag">(équilibre ~50/50)</span>':'')+'</td><td class="num">'+fo.toFixed(2)+'</td><td class="num">'+fu.toFixed(2)+'</td></tr>';
+  });
+  return html+'</tbody></table>';
 }
 // ligne d'equilibre du marche a partir des cotes
 function impliedOver(oo,uu){var io=1/oo,iu=1/uu;return io/(io+iu);}
@@ -388,7 +422,7 @@ function predict(name,opp,isHome,compKey){
   var sdSot=Math.max(std(sot)*0.9,1.0);
   var rc=reco(exp,sd), rcs=reco(expSot,sdSot);
   function pO(thr,mu,s){return Math.round((1-normCdf(thr,mu,s))*100);}
-  return {name:name,opp:opp,isHome:isHome,exp:r1(exp),expSot:r1(expSot),sd:r1(sd),
+  return {name:name,opp:opp,isHome:isHome,exp:r1(exp),expSot:r1(expSot),sd:r1(sd),sdSot:r1(sdSot),
     form5:r1(form5),form10:r1(form10),oppCd:r1(oc),defF:defF,xg:xgf.length?r2(mean(xgf)):null,
     intv:[Math.round(exp-0.85*sd),Math.round(exp+0.85*sd)],intvS:[Math.round(expSot-0.85*sdSot),Math.round(expSot+0.85*sdSot)],
     recoShots:rc,recoSot:rcs,
@@ -408,6 +442,8 @@ function runAnalyse(){
     '<div class="est"><div class="b"><div class="l">Tirs estimés</div><div class="big">'+R.exp+'</div><div class="rng">fourchette '+R.intv[0]+'–'+R.intv[1]+'</div></div>'+
     '<div class="b s"><div class="l">Tirs cadrés estimés</div><div class="big">'+R.expSot+'</div><div class="rng">fourchette '+R.intvS[0]+'–'+R.intvS[1]+'</div></div></div>'+
     recoHTML(R.recoShots,"Tirs")+recoHTML(R.recoSot,"Tirs cadrés")+
+    '<div class="secTitle">Mes cotes équitables — tirs (à comparer aux bookmakers)</div>'+fairTable(R.exp,R.sd)+
+    '<div class="secTitle">Mes cotes équitables — tirs cadrés</div>'+fairTable(R.expSot,R.sdSot)+
     '<div class="secTitle">Probabilités — tirs</div>'+pb(R.probs,"tirs")+
     '<div class="secTitle">Probabilités — tirs cadrés</div>'+pb(R.probsS,"cadrés")+
     '<div class="secTitle">Pourquoi</div><ul class="reasons">'+
