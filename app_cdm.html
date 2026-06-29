@@ -108,6 +108,7 @@
     <div class="panel">
       <div class="row">
         <div class="field"><label>Rechercher une équipe</label><input id="q" placeholder="Ex. Canada, Allemagne, Manchester City…"></div>
+        <div class="field" style="max-width:200px"><label>Type d'équipe</label><select id="fcat"><option value="all">Toutes</option><option value="nation">Équipes nationales</option><option value="club">Clubs</option></select></div>
         <div class="field" style="max-width:240px"><label>Compétition</label><select id="fcomp"></select></div>
         <div class="field" style="max-width:150px"><label>Saison</label><select id="fseason"></select></div>
       </div>
@@ -233,11 +234,43 @@ function teamMatches(name,comp,season){
 function teamComps(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.comp)s[m.comp]=1;});return Object.keys(s).sort();}
 function teamSeasons(name){var s={};(TEAMS[name]?TEAMS[name].matches:[]).forEach(function(m){if(m.season)s[m.season]=1;});return Object.keys(s).sort().reverse();}
 
+// ---- classification nationale / club ----
+function compCat(c){
+  if(typeof COMP_CAT!=="undefined"&&COMP_CAT&&COMP_CAT[c])return COMP_CAT[c];
+  // sinon : club uniquement si championnat/coupe de club connu, sinon sélection nationale
+  return /premier league|\bla ?liga\b|\bserie a\b|bundesliga|\bligue 1\b|\bfa cup\b|copa del rey|coppa italia|dfb pokal|coupe de france|champions league|europa league|conference league|eredivisie|primeira liga|liga portugal/i.test(c||"")?"club":"nation";
+}
+var _typeCache={};
+function teamType(name){
+  if(_typeCache[name]!=null)return _typeCache[name];
+  var ms=TEAMS[name]?TEAMS[name].matches:[],nat=false;
+  for(var i=0;i<ms.length;i++){if(compCat(ms[i].comp)==="nation"){nat=true;break;}}
+  _typeCache[name]=nat?"nation":"club";return _typeCache[name];
+}
+// cascade Type -> Competition -> Saison pour l'onglet Equipes
+function populateTeamFilters(){
+  var cat=$("fcat").value, prevComp=$("fcomp").value;
+  var comps=((typeof COMPS!=="undefined"&&COMPS.length)?COMPS:[]).filter(function(c){return cat==="all"||compCat(c)===cat;});
+  var keep=comps.indexOf(prevComp)>=0?prevComp:"all";
+  $("fcomp").innerHTML='<option value="all">Toutes compétitions</option>'+comps.map(function(c){return '<option'+(c===keep?' selected':'')+'>'+c+'</option>';}).join("");
+  populateSeasonOptions();
+}
+function populateSeasonOptions(){
+  var cat=$("fcat").value, comp=$("fcomp").value, prev=$("fseason").value, seasons={};
+  Object.keys(TEAMS).forEach(function(n){
+    if(cat!=="all"&&teamType(n)!==cat)return;
+    TEAMS[n].matches.forEach(function(m){if(comp&&comp!=="all"&&m.comp!==comp)return;if(m.season)seasons[m.season]=1;});
+  });
+  var sl=Object.keys(seasons).sort().reverse();
+  var keep=sl.map(String).indexOf(String(prev))>=0?prev:"all";
+  $("fseason").innerHTML='<option value="all">Toutes</option>'+sl.map(function(s){return '<option'+(String(s)===String(keep)?' selected':'')+'>'+s+'</option>';}).join("");
+}
 // ---- liste d'equipes ----
 function renderTeamList(){
-  var q=($("q").value||"").toLowerCase(), comp=$("fcomp").value, season=$("fseason").value;
+  var q=($("q").value||"").toLowerCase(), cat=$("fcat").value, comp=$("fcomp").value, season=$("fseason").value;
   var names=Object.keys(TEAMS).filter(function(n){
     if(q&&fr(n).toLowerCase().indexOf(q)<0&&n.toLowerCase().indexOf(q)<0)return false;
+    if(cat&&cat!=="all"&&teamType(n)!==cat)return false;
     if(comp&&comp!=="all"&&teamComps(n).indexOf(comp)<0)return false;
     if(season&&season!=="all"){var ok=TEAMS[n].matches.some(function(m){return String(m.season)===String(season);});if(!ok)return false;}
     return true;
@@ -602,11 +635,10 @@ function buildBacktest(){
 function fillFilters(){
   var comps=(typeof COMPS!=="undefined"&&COMPS.length)?COMPS:[];
   var copt='<option value="all">Toutes compétitions</option>'+comps.map(function(c){return '<option>'+c+'</option>';}).join("");
-  $("fcomp").innerHTML=copt;
+  // équipes : cascade Type -> Compétition -> Saison
+  populateTeamFilters();
   var seasons={};Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){if(m.season)seasons[m.season]=1;});});
   var sl=Object.keys(seasons).sort().reverse();
-  var sopt='<option value="all">Toutes</option>'+sl.map(function(s){return '<option>'+s+'</option>';}).join("");
-  $("fseason").innerHTML=sopt;
   // filtres backtest
   var tnames=Object.keys(TEAMS).sort(function(a,b){return fr(a).localeCompare(fr(b));});
   $("btTeam").innerHTML='<option value="all">Toutes les équipes</option>'+tnames.map(function(n){return '<option value="'+esc(n)+'">'+fr(n)+'</option>';}).join("");
@@ -757,7 +789,8 @@ window.addEventListener("DOMContentLoaded",function(){
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
   fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest(); buildBankroll();
   $("q").addEventListener("input",renderTeamList);
-  $("fcomp").addEventListener("change",renderTeamList);
+  $("fcat").addEventListener("change",function(){populateTeamFilters();renderTeamList();});
+  $("fcomp").addEventListener("change",function(){populateSeasonOptions();renderTeamList();});
   $("fseason").addEventListener("change",renderTeamList);
   ["btTeam","btComp","btSeason","btMetric","btScope","btFrom","btTo"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   $("btReset").addEventListener("click",function(){$("btFrom").value="";$("btTo").value="";buildBacktest();});

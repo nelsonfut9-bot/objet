@@ -278,9 +278,16 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
     allts=[r["ts"] for t in TEAMS.values() for r in t["matches"]]
     la=round(mean(allts),1) if allts else 12.5
     comps=sorted([c for c in comps if c])
+    # categorie par competition (nation / club) pour le filtre en cascade du site
+    club_lids={str(_lid) for _lid,_label,_cat,_seasons in COMPETITIONS if _cat=="club"}
+    comp_cat={}
+    for fid,m in matches.items():
+        ln=m.get("lname","")
+        if ln: comp_cat[ln]="club" if str(m.get("lid")) in club_lids else "nation"
     payload=("// Genere automatiquement (GitHub Actions). Maj: "+datetime.datetime.now(datetime.timezone.utc).strftime("%d/%m/%Y %H:%M")+" UTC\n"
         "var LEAGUE_AVG = "+json.dumps(la)+";\n"
         "var COMPS = "+json.dumps(comps,ensure_ascii=False)+";\n"
+        "var COMP_CAT = "+json.dumps(comp_cat,ensure_ascii=False)+";\n"
         "var TEAMS = "+json.dumps(TEAMS,ensure_ascii=False)+";\n"
         "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n")
     open(OUTPUT,"w",encoding="utf-8").write(payload)
