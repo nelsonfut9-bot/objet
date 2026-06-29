@@ -155,7 +155,7 @@
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
       <p class="small muted">Backtest 100% honnête : pour chaque match, l'estimation n'utilise QUE les matchs joués AVANT cette date — jamais le match lui-même, jamais les matchs postérieurs. Comme si je n'avais pas vu le résultat. Cliquez une ligne pour voir le détail et la prédiction d'avant-match.</p>
       <div class="filterbar">
-        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="cor">Corners</option><option value="xg">Buts attendus (xG)</option></select></div>
+        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="xg">Buts attendus (xG)</option></select></div>
         <div class="field"><label>Portée</label><select id="btScope"><option value="all">Tout (équipes + match)</option><option value="teams">Par équipe (A &amp; B)</option><option value="match">Match (total) seulement</option></select></div>
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
@@ -179,7 +179,7 @@
       <p class="small muted">Pour chaque match dont on a capté les <b>vraies cotes bookmaker</b>, je place une mise fixe de <b>200 €</b> sur le côté (OVER/UNDER) recommandé par mon modèle d'avant-match (zéro lookahead), puis je règle le pari avec le résultat réel. Seules les vraies cotes sont utilisées : la bankroll se remplit au fur et à mesure que les matchs à venir (cotes déjà captées) sont joués.</p>
       <div class="filterbar">
         <div class="field"><label>Mise</label><select id="bkStake"><option value="flat">Fixe 200 €</option><option value="kelly">Kelly (½, base 1000 €)</option></select></div>
-        <div class="field"><label>Type de pari</label><select id="bkType"><option value="all">Tous</option><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="cor">Corners</option><option value="goals">Buts</option></select></div>
+        <div class="field"><label>Type de pari</label><select id="bkType"><option value="all">Tous</option><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="goals">Buts</option></select></div>
         <div class="field"><label>Marché</label><select id="bkScope"><option value="all">Tous</option><option value="totals">Totaux match</option><option value="teams">Par équipe</option></select></div>
         <div class="field"><label>Statut</label><select id="bkStatus"><option value="all">Tous</option><option value="settled">Réglés</option><option value="pending">En attente</option></select></div>
         <div class="field" style="max-width:160px"><label>Du</label><input type="date" id="bkFrom"></div>
@@ -507,9 +507,13 @@ function predict(name,opp,isHome,compKey){
   if(corV.length>=3){var cb=0.6*mean(corV.slice(0,5))+0.4*mean(corV.slice(0,10));corExp=Math.max(0,cb*(isHome?1.08:0.94)+(CAL.cor_bias||0));recoCor=reco(corExp,CAL.cor||3.3);}
   var xgExp=null,recoXg=null;
   if(xgV.length>=3){var xb=0.6*mean(xgV.slice(0,5))+0.4*mean(xgV.slice(0,10));xgExp=Math.max(0,xb*(isHome?1.08:0.94)+(CAL.xg_bias||0));recoXg=reco(xgExp,CAL.xg||0.9);}
+  // buts marqués (pour le marché Over/Under buts)
+  var goalsV=ms.map(function(m){return m.gf;}).filter(function(x){return x!=null;});
+  var goalsExp=null,recoGoals=null;
+  if(goalsV.length>=3){var gb=0.6*mean(goalsV.slice(0,5))+0.4*mean(goalsV.slice(0,10));goalsExp=Math.max(0,gb*(isHome?1.10:0.92));recoGoals=reco(goalsExp,1.1);}
   function pO(thr,mu,s){return Math.round((1-normCdf(thr,mu,s))*100);}
   return {name:name,opp:opp,isHome:isHome,exp:r1(exp),expSot:r1(expSot),sd:r1(sd),sdSot:r1(sdSot),
-    corExp:corExp==null?null:r1(corExp),recoCor:recoCor,xgExp:xgExp==null?null:r2(xgExp),recoXg:recoXg,
+    xgExp:xgExp==null?null:r2(xgExp),recoXg:recoXg,goalsExp:goalsExp==null?null:r1(goalsExp),recoGoals:recoGoals,
     form5:r1(form5),form10:r1(form10),oppCd:r1(oc),defF:defF,xg:xgV.length?r2(mean(xgV)):null,
     intv:[Math.max(0,Math.round(exp-0.85*sd)),Math.max(0,Math.round(exp+0.85*sd))],intvS:[Math.max(0,Math.round(expSot-0.85*sdSot)),Math.max(0,Math.round(expSot+0.85*sdSot))],
     recoShots:rc,recoSot:rcs,
@@ -526,7 +530,7 @@ function findOdds(home,away){
 }
 function oddsHTML(o){
   if(!o||!o.markets)return "";
-  var lab={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadres (match)","Shots. Home Total":"Tirs "+fr(o.h),"Shots. Away Total":"Tirs "+fr(o.a),"Home Total ShotOnGoal":"Tirs cadres "+fr(o.h),"Away Total ShotOnGoal":"Tirs cadres "+fr(o.a),"Home Shots On Target":"Tirs cadres "+fr(o.h),"Away Shots On Target":"Tirs cadres "+fr(o.a)};
+  var lab={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadres (match)","Shots. Home Total":"Tirs "+fr(o.h),"Shots. Away Total":"Tirs "+fr(o.a),"Home Total ShotOnGoal":"Tirs cadres "+fr(o.h),"Away Total ShotOnGoal":"Tirs cadres "+fr(o.a),"Home Shots On Target":"Tirs cadres "+fr(o.h),"Away Shots On Target":"Tirs cadres "+fr(o.a),"Goals Over/Under":"Total buts (match)"};
   var blocks="";
   for(var m in o.markets){var mk=o.markets[m];
     var lr="";
@@ -544,11 +548,12 @@ function estMarche(m,Rh,Ra){
   if(m==="Shots. Away Total")return Ra.exp;
   if(m==="Home Total ShotOnGoal"||m==="Home Shots On Target")return Rh.expSot;
   if(m==="Away Total ShotOnGoal"||m==="Away Shots On Target")return Ra.expSot;
+  if(m==="Goals Over/Under")return (Rh.goalsExp!=null&&Ra.goalsExp!=null)?Rh.goalsExp+Ra.goalsExp:null;
   return null;
 }
 function betAdvice(o,Rh,Ra){
   if(!o||!o.markets)return "";
-  var lab={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadres (match)","Shots. Home Total":"Tirs "+fr(o.h),"Shots. Away Total":"Tirs "+fr(o.a),"Home Total ShotOnGoal":"Tirs cadres "+fr(o.h),"Away Total ShotOnGoal":"Tirs cadres "+fr(o.a),"Home Shots On Target":"Tirs cadres "+fr(o.h),"Away Shots On Target":"Tirs cadres "+fr(o.a)};
+  var lab={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadres (match)","Shots. Home Total":"Tirs "+fr(o.h),"Shots. Away Total":"Tirs "+fr(o.a),"Home Total ShotOnGoal":"Tirs cadres "+fr(o.h),"Away Total ShotOnGoal":"Tirs cadres "+fr(o.a),"Home Shots On Target":"Tirs cadres "+fr(o.h),"Away Shots On Target":"Tirs cadres "+fr(o.a),"Goals Over/Under":"Total buts (match)"};
   var rows="";
   for(var m in o.markets){var mk=o.markets[m];
     var est=estMarche(m,Rh,Ra); if(est==null)continue;
@@ -568,15 +573,14 @@ function teamCard(R,lieu){
     '<div style="margin-top:8px;font-size:14px">Tirs : <span class="big" style="font-size:26px">'+R.exp+'</span> <span class="muted small">('+R.intv[0]+'–'+R.intv[1]+')</span></div>'+
     '<div style="font-size:14px;margin-top:2px">Tirs cadrés : <span class="big" style="font-size:26px;color:var(--accent2)">'+R.expSot+'</span> <span class="muted small">('+R.intvS[0]+'–'+R.intvS[1]+')</span></div>'+
     recoHTML(R.recoShots,"Tirs "+fr(R.name))+recoHTML(R.recoSot,"Cadrés "+fr(R.name))+
-    (R.corExp!=null?'<div style="font-size:14px;margin-top:6px">Corners : <span class="big" style="font-size:22px;color:var(--warn)">'+R.corExp+'</span></div>'+recoHTML(R.recoCor,"Corners "+fr(R.name)):'')+
-    (R.xgExp!=null?'<div style="font-size:14px;margin-top:4px">Buts attendus (xG) : <span class="big" style="font-size:22px;color:var(--xg)">'+frn(R.xgExp)+'</span></div>'+recoHTML(R.recoXg,"xG "+fr(R.name)):'')+'</div>';
+    (R.xgExp!=null?'<div style="font-size:14px;margin-top:6px">Buts attendus (xG) : <span class="big" style="font-size:22px;color:var(--xg)">'+frn(R.xgExp)+'</span></div>'+recoHTML(R.recoXg,"xG "+fr(R.name)):'')+'</div>';
 }
 function matchTotalsHTML(Rh,Ra){
   if(!Rh||Rh.noData||!Ra||Ra.noData)return '';
   function L(lbl,h,a,dec){if(h==null||a==null)return '';var t=h+a;return '<div class="srow"><span class="lab">'+lbl+'</span><span><b>'+(dec?frn(r1(t)):Math.round(t))+'</b></span></div>';}
   return '<div class="secTitle">Totaux match (mon estimation)</div><div class="prebox">'+
     L("Total tirs",Rh.exp,Ra.exp)+L("Total tirs cadrés",Rh.expSot,Ra.expSot)+
-    L("Total corners",Rh.corExp,Ra.corExp)+L("Total buts attendus (xG)",Rh.xgExp,Ra.xgExp,1)+'</div>';
+    L("Total buts attendus (xG)",Rh.xgExp,Ra.xgExp,1)+'</div>';
 }
 function runAnalyse(){
   try{

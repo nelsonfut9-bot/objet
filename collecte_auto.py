@@ -100,8 +100,7 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
 ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
-    "goals over/under","corners over under","total corners","total - corners",
-    "cards over/under","total cards","total - cards"}
+    "goals over/under"}
 def _parse_ou(values):
     over={}; under={}
     for v in (values or []):
@@ -202,27 +201,37 @@ def run():
             progress["priority_teams"]=alive if alive else allt
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],str(WC_LEAGUE),True)
             print("  Selections prioritaires:",len(progress["priority_teams"]))
+        # file de récupération des calendriers : sélections ET championnats de clubs EN ALTERNANCE
+        # (avant, les clubs n'étaient jamais atteints car les sélections épuisaient le quota)
+        nat_tasks=[]
         for tid,name in list(progress["priority_teams"].items()):
             for s in PRIORITY_SEASONS:
-                key=f"T{tid}_{s}"
-                if progress["fixtures_done"].get(key): continue
-                if not can_continue(used): raise Stop()
-                resp=api_get("/fixtures",{"team":tid,"season":s},used)
-                add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],None,True)
-                progress["fixtures_done"][key]=True; time.sleep(SLEEP)
+                nat_tasks.append(("T%s_%s"%(tid,s), {"team":tid,"season":s}, None, True))
+        club_tasks=[]
         for lid,label,cat,seasons in COMPETITIONS:
             for s in seasons:
-                key=f"{lid}_{s}"
-                if progress["fixtures_done"].get(key): continue
-                if not can_continue(used): raise Stop()
-                resp=api_get("/fixtures",{"league":lid,"season":s},used)
-                add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],str(lid),False)
-                progress["fixtures_done"][key]=True; time.sleep(SLEEP)
+                club_tasks.append(("%s_%s"%(lid,s), {"league":lid,"season":s}, str(lid), False))
+        fixture_tasks=[]; i=j=0
+        while i<len(nat_tasks) or j<len(club_tasks):
+            if j<len(club_tasks): fixture_tasks.append(club_tasks[j]); j+=1
+            if i<len(nat_tasks): fixture_tasks.append(nat_tasks[i]); i+=1
+        for key,params,lid,prio in fixture_tasks:
+            if progress["fixtures_done"].get(key): continue
+            if not can_continue(used): raise Stop()
+            resp=api_get("/fixtures",params,used)
+            add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],lid,prio)
+            progress["fixtures_done"][key]=True; time.sleep(SLEEP)
         seen=set(); pend=[]
         for it in progress["pending_fixtures"]:
             if it["fid"] in matches or it["fid"] in seen: continue
             seen.add(it["fid"]); pend.append(it)
-        pend.sort(key=lambda x:x["date"],reverse=True); pend.sort(key=lambda x:0 if x.get("prio") else 1)
+        pend.sort(key=lambda x:x["date"],reverse=True)
+        # alterne sélections / clubs pour que les deux se remplissent en parallèle
+        _p=[it for it in pend if it.get("prio")]; _o=[it for it in pend if not it.get("prio")]
+        pend=[]; pi=oi=0
+        while pi<len(_p) or oi<len(_o):
+            if pi<len(_p): pend.append(_p[pi]); pi+=1
+            if oi<len(_o): pend.append(_o[oi]); oi+=1
         for it in pend:
             if not can_continue(used): raise Stop()
             stats=api_get("/fixtures/statistics",{"fixture":it["fid"]},used)
