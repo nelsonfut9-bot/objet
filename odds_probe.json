@@ -1,7 +1,6 @@
 {
- "genere": "28/06/2026 20:53 UTC",
- "nb_types_de_paris": 338,
- "paris_tirs": [
+ "genere": "29/06/2026 01:01 UTC",
+ "marches_tirs_catalogue": [
   "Away Player Shots",
   "Away Player Shots On Target Total",
   "Away Player Shots Total",
@@ -24,346 +23,940 @@
   "Total ShotOnGoal",
   "Total Shots"
  ],
- "tous_les_paris": [
-  "10 Over/Under",
-  "1x2 - 15 minutes",
-  "1x2 - 20 minutes",
-  "1x2 - 30 minutes",
-  "1x2 - 60 minutes",
-  "1x2 - 70 minutes",
-  "1x2 - 75 minutes",
-  "Anytime Goal Scorer",
-  "Asian Handicap",
-  "Asian Handicap (2nd Half)",
-  "Asian Handicap (Sets)",
-  "Asian Handicap First Half",
-  "Away Anytime Goal Scorer",
-  "Away Come From Behind and Draw",
-  "Away Come From Behind and Win",
-  "Away Corners Over/Under",
-  "Away Exact Goals Number (1st Half)",
-  "Away First Goal Scorer",
-  "Away Goal Method Header",
-  "Away Goal Method Outside the Box",
-  "Away Goalkeeper Saves",
-  "Away Highest Scoring Half",
-  "Away Last Goal Scorer",
-  "Away No Bet",
-  "Away Not lose/Over",
-  "Away Not lose/Under",
-  "Away Odd/Even",
-  "Away Player Assists",
-  "Away Player Fouls Committed",
-  "Away Player Passes",
-  "Away Player Shots",
-  "Away Player Shots On Target Total",
-  "Away Player Shots Total",
-  "Away Player Tackles",
-  "Away Player to Score or Assist",
-  "Away Shots On Target",
-  "Away Team Exact Goals Number",
-  "Away Team Goalscorers First",
-  "Away Team Goalscorers Last",
-  "Away Team Score a Goal",
-  "Away Team Score a Goal (1st Half)",
-  "Away Team Score a Goal (2nd Half)",
-  "Away Team Total Cards",
-  "Away Team Total Goals(1st Half)",
-  "Away Team Total Goals(2nd Half)",
-  "Away Team Yellow Cards",
-  "Away To Score Three or More Goals",
-  "Away To Score Two or More Goals",
-  "Away Total Corners (1st Half)",
-  "Away Total Corners (2nd Half)",
-  "Away Total ShotOnGoal",
-  "Away Win To Nill (1st Half)",
-  "Away Win To Nill (2nd Half)",
-  "Away Win/Over",
-  "Away Win/Under",
-  "Away Winning Margin (1st Set)",
-  "Away team will score in both halves",
-  "Away team will win either half",
-  "Away win both halves",
-  "Both Teams Score",
-  "Both Teams Score - First Half",
-  "Both Teams To Score - Second Half",
-  "Both Teams To Score in Both Halves",
-  "Both Teams to Receive 2+ Cards",
-  "Both Teams to Receive a Card",
-  "Both Teams to Score 1st Half - 2nd Half",
-  "Cards Asian Handicap",
-  "Cards European Handicap",
-  "Cards Over/Under",
-  "Cards over/under between 0 and 10 m",
-  "Clean Sheet",
-  "Clean Sheet - Away",
-  "Clean Sheet - Home",
-  "Corner in 1-15 minutes",
-  "Corner in 16-30 minutes",
-  "Corner in 31-45 minutes",
-  "Corner in 45-60 minutes",
-  "Corner in 60-75 minutes",
-  "Corner in 75-90 minutes",
-  "Corners 1x2",
-  "Corners 1x2 (1st Half)",
-  "Corners 1x2 (2nd Half)",
-  "Corners Asian Handicap",
-  "Corners Asian Handicap (1st Half)",
-  "Corners Asian Handicap (2nd Half)",
-  "Corners Over Under",
-  "Corners Race To",
-  "Corners. Double Chance",
-  "Corners. Double Chance",
-  "Corners. European Handicap",
-  "Corners. First Corner (3 way)",
-  "Corners. Odd/Even",
-  "Corners. Total (Range)",
-  "Corners. total between 0 and 10m",
-  "Correct Score - First Half",
-  "Correct Score - Second Half",
-  "DC - 15 minutes",
-  "DC - 30 minutes",
-  "DC - 60 minutes",
-  "DC - 75 minutes",
-  "Double Chance",
-  "Double Chance - First Half",
-  "Double Chance - Second Half",
-  "Double Chance 0-15m",
-  "Double Chance 15-30m",
-  "Double Chance 30-45m",
-  "Double Chance/Both Teams To Score",
-  "Double Chance/Total",
-  "Draw No Bet (1st Half)",
-  "Draw No Bet (2nd Half)",
-  "Early Goal (Range)",
-  "Either Team Wins By 1 Goals",
-  "Either Team Wins By 2 Goals",
-  "European Handicap (2nd Half)",
-  "Exact Goals Number",
-  "Exact Goals Number - First Half",
-  "Exact Score",
-  "Extra Point (1st Set)",
-  "First 10 min Winner",
-  "First Card Received (3 way)",
-  "First Corner",
-  "First Goal Method",
-  "First Goal Scorer",
-  "First Half Winner",
-  "First Set Piece 5 Minutes",
-  "First Team to Score",
-  "First Team to Score (3 way) 1st Half",
-  "First Team to Score (3 way) 2nd Half",
-  "Fouls Odd/Even",
-  "Fouls. 1x2",
-  "Fouls. Away Total",
-  "Fouls. Double Chance",
-  "Fouls. Handicap",
-  "Fouls. Home Total",
-  "Fouls. Odd/Even",
-  "Fouls. Total",
-  "Game Decided After Penalties",
-  "Game Decided in Extra Time",
-  "Goal Line",
-  "Goal Line",
-  "Goal Line (1st Half)",
-  "Goal Method Header",
-  "Goal Method Outside the Box",
-  "Goal in 1-15 minutes",
-  "Goal in 16-30 minutes",
-  "Goal in 31-45 minutes",
-  "Goal in 46-60 minutes",
-  "Goal in 61-75 minutes",
-  "Goal in 76-90 minutes",
-  "Goalkeeper Saves",
-  "Goals Over/Under",
-  "Goals Over/Under - Second Half",
-  "Goals Over/Under First Half",
-  "HT/FT Double",
-  "Halftime Result/Both Teams Score",
-  "Halftime Result/Total Goals",
-  "Handicap Result",
-  "Handicap Result - First Half",
-  "Highest Scoring Half",
-  "Home Anytime Goal Scorer",
-  "Home Come From Behind and Draw",
-  "Home Come From Behind and Win",
-  "Home Corners Over/Under",
-  "Home Exact Goals Number (1st Half)",
-  "Home First Goal Scorer",
-  "Home Goal Method Header",
-  "Home Goal Method Outside the Box",
-  "Home Goalkeeper Saves",
-  "Home Highest Scoring Half",
-  "Home Last Goal Scorer",
-  "Home No Bet",
-  "Home Not lose/Over",
-  "Home Not lose/Under",
-  "Home Odd/Even",
-  "Home Player Assists",
-  "Home Player Fouls Committed",
-  "Home Player Passes",
-  "Home Player Shots",
-  "Home Player Shots On Target Total",
-  "Home Player Shots Total",
-  "Home Player Tackles",
-  "Home Player to Score or Assist",
-  "Home Shots On Target",
-  "Home Team Exact Goals Number",
-  "Home Team Goalscorers First",
-  "Home Team Goalscorers Last",
-  "Home Team Score a Goal",
-  "Home Team Score a Goal (1st Half)",
-  "Home Team Score a Goal (2nd Half)",
-  "Home Team Total Cards",
-  "Home Team Total Goals(1st Half)",
-  "Home Team Total Goals(2nd Half)",
-  "Home Team Yellow Cards",
-  "Home To Score Three or More Goals",
-  "Home To Score Two or More Goals",
-  "Home Total Corners (1st Half)",
-  "Home Total Corners (2nd Half)",
-  "Home Total ShotOnGoal",
-  "Home Win To Nill (1st Half)",
-  "Home Win To Nill (2nd Half)",
-  "Home Win/Over",
-  "Home Win/Under",
-  "Home Winning Margin (1st Set)",
-  "Home team will score in both halves",
-  "Home team will win either half",
-  "Home win both halves",
-  "Home/Away",
-  "Last Corner",
-  "Last Goal Scorer",
-  "Last Goal Scorer",
-  "Last Team to Score",
-  "Late Goal (Range)",
-  "Match Winner",
-  "Method of Victory",
-  "Multi Touchdown Scorer (2 or More)",
-  "Multi Touchdown Scorer (3 or More)",
-  "Multicorners",
-  "Number Of Goals In Match",
-  "Number of Goals In Match (Range)",
-  "Odd/Even",
-  "Odd/Even (1st Set)",
-  "Odd/Even - First Half",
-  "Odd/Even - Second Half",
-  "Offsides 1x2",
-  "Offsides Away Total",
-  "Offsides Double Chance",
-  "Offsides Handicap",
-  "Offsides Home Total",
-  "Offsides Odd/Even",
-  "Offsides Total",
-  "Over/Under 15m-30m",
-  "Over/Under 30m-45m",
-  "Over/Under between  0 and 10 m",
-  "Over/Under between 0 and 10 m",
-  "Over/Under between 0 and 10m",
-  "Own Goal",
-  "Penalty Awarded",
-  "Penalty Awarded (1st Half)",
-  "Penalty Awarded (2nd Half)",
-  "Player Assists",
-  "Player Fouls Committed",
-  "Player Points",
-  "Player Shots On Target",
-  "Player Shots On Target Total",
-  "Player Shots Total",
-  "Player Singles",
-  "Player Triples",
-  "Player to Score or Assist",
-  "Player to be Sent Off",
-  "Player to be booked",
-  "Player to be booked",
-  "RCARD",
-  "RTG_H1",
-  "Race To",
-  "Race to the 2nd goal?",
-  "Race to the 3rd goal?",
-  "Red Card In The Match (1st Half)",
-  "Red Cards Over/Under",
-  "Result/Total Goals",
-  "Result/Total Goals (2nd Half)",
-  "Results/Both Teams Score",
-  "Saves 1x2",
-  "Saves Asian H",
-  "Saves Double Chance",
-  "Saves O/U Away",
-  "Saves O/U Home",
-  "Saves Odd/Even",
-  "Saves Total",
-  "Scoring Draw",
-  "Second Half Exact Goals Number",
-  "Second Half Winner",
-  "Set Betting",
-  "ShotOnTarget 1x2",
-  "ShotOnTarget Double Chance",
-  "ShotOnTarget Handicap",
-  "Shots. Away Total",
-  "Shots. Home Total",
-  "Shots.1x2",
-  "Tackles. Away Total",
-  "Tackles. Home Total",
-  "Team Goalscorers First",
-  "Team Goalscorers Last",
-  "Team Performances (Range)",
-  "Team Time Of 1st Score",
-  "Team To Score (Goals)",
-  "Team To Score First",
-  "Team To Score Last",
-  "Time Of 1st Score",
-  "Time Of 1st Score",
-  "Time of First Goal Brackets (Range)",
-  "To Advance Handicap",
-  "To Miss A Penalty",
-  "To Qualify",
-  "To Score A Penalty",
-  "To Score In 1st Half",
-  "To Score In 2nd Half",
-  "To Score In Both Halves By Teams",
-  "To Score Two or More Goals",
-  "To Score in Both Halves",
-  "To Win Either Half",
-  "To Win From Behind",
-  "Total - Away",
-  "Total - Home",
-  "Total Corners (1st Half)",
-  "Total Corners (2nd Half)",
-  "Total Corners (3 way)",
-  "Total Corners (3 way) (1st Half)",
-  "Total Corners (3 way) (2nd Half)",
-  "Total Goal Minutes (Range)",
-  "Total Goals (3 way)",
-  "Total Goals By Ranges (1st Half)",
-  "Total Goals Number By Ranges",
-  "Total Goals/Both Teams To Score",
-  "Total ShotOnGoal",
-  "Total Shots",
-  "Total Tackles",
-  "Which team will score the 1st goal?",
-  "Win Both Halves",
-  "Win To Nil",
-  "Win to Nil - Away",
-  "Win to Nil - Home",
-  "Winning Margin",
-  "Yellow Asian Handicap",
-  "Yellow Asian Handicap (1st Half)",
-  "Yellow Asian Handicap (2nd Half)",
-  "Yellow Cards 1x2",
-  "Yellow Cards 1x2 (1st Half)",
-  "Yellow Cards 1x2 (2nd Half)",
-  "Yellow Cards Away Total (1st Half)",
-  "Yellow Cards. Home Total (1st Half)",
-  "Yellow Cards. Odd/Even (1st Half)",
-  "Yellow Cards. Odd/Even (2nd Half)",
-  "Yellow Double Chance",
-  "Yellow Odd/Even",
-  "Yellow Over/Under",
-  "Yellow Over/Under (1st Half)",
-  "Yellow Over/Under (2nd Half)"
- ],
- "exemple_match": {
-  "info": "aucune cote trouvee sur les ligues testees (les cotes API ne couvrent souvent que les matchs proches)"
+ "verif_cotes_tirs": {
+  "trouve": true,
+  "matchs_scannes": 29,
+  "exemples": [
+   {
+    "date": "2026-06-29",
+    "fixture": 1562344,
+    "book": "Bet365",
+    "marche": "Shots.1x2",
+    "valeurs": [
+     {
+      "value": "Home",
+      "odd": "1.33"
+     },
+     {
+      "value": "Draw",
+      "odd": "15.00"
+     },
+     {
+      "value": "Away",
+      "odd": "3.40"
+     }
+    ]
+   },
+   {
+    "date": "2026-06-29",
+    "fixture": 1562344,
+    "book": "Bet365",
+    "marche": "Total ShotOnGoal",
+    "valeurs": [
+     {
+      "value": "Over 8.5",
+      "odd": "2.10"
+     },
+     {
+      "value": "Under 8.5",
+      "odd": "1.67"
+     }
+    ]
+   },
+   {
+    "date": "2026-06-29",
+    "fixture": 1562344,
+    "book": "Bet365",
+    "marche": "ShotOnTarget 1x2",
+    "valeurs": [
+     {
+      "value": "Home",
+      "odd": "1.53"
+     },
+     {
+      "value": "Draw",
+      "odd": "7.50"
+     },
+     {
+      "value": "Away",
+      "odd": "3.10"
+     }
+    ]
+   },
+   {
+    "date": "2026-06-29",
+    "fixture": 1562344,
+    "book": "Bet365",
+    "marche": "Total Shots",
+    "valeurs": [
+     {
+      "value": "Over 23.5",
+      "odd": "1.73"
+     },
+     {
+      "value": "Under 23.5",
+      "odd": "2.00"
+     }
+    ]
+   },
+   {
+    "date": "2026-06-29",
+    "fixture": 1562344,
+    "book": "Bet365",
+    "marche": "Home Player Shots",
+    "valeurs": [
+     {
+      "value": "Vinicius Jr. - 1+",
+      "odd": "1.02"
+     },
+     {
+      "value": "Endrick - 1+",
+      "odd": "1.04"
+     },
+     {
+      "value": "Igor Thiago - 1+",
+      "odd": "1.04"
+     },
+     {
+      "value": "Raphinha - 1+",
+      "odd": "1.05"
+     },
+     {
+      "value": "Rayan Vitor - 1+",
+      "odd": "1.14"
+     },
+     {
+      "value": "Lucas Paqueta - 1+",
+      "odd": "1.28"
+     },
+     {
+      "value": "Luiz Henrique - 1+",
+      "odd": "1.10"
+     },
+     {
+      "value": "Gabriel Martinelli - 1+",
+      "odd": "1.10"
+     },
+     {
+      "value": "Matheus Cunha - 1+",
+      "odd": "1.03"
+     },
+     {
+      "value": "Danilo dos Santos - 1+",
+      "odd": "1.18"
+     },
+     {
+      "value": "Leo Pereira - 1+",
+      "odd": "1.57"
+     },
+     {
+      "value": "Casemiro - 1+",
+      "odd": "1.44"
+     },
+     {
+      "value": "Fabinho - 1+",
+      "odd": "1.62"
+     },
+     {
+      "value": "Douglas Santos - 1+",
+      "odd": "1.62"
+     },
+     {
+      "value": "Gabriel Magalhaes - 1+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Danilo da Silva - 1+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Alex Sandro - 1+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Bremer - 1+",
+      "odd": "1.73"
+     },
+     {
+      "value": "Roger Ibanez - 1+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Marquinhos - 1+",
+      "odd": "2.25"
+     },
+     {
+      "value": "Vinicius Jr. - 2+",
+      "odd": "1.12"
+     },
+     {
+      "value": "Endrick - 2+",
+      "odd": "1.25"
+     },
+     {
+      "value": "Igor Thiago - 2+",
+      "odd": "1.22"
+     },
+     {
+      "value": "Raphinha - 2+",
+      "odd": "1.28"
+     },
+     {
+      "value": "Rayan Vitor - 2+",
+      "odd": "1.62"
+     },
+     {
+      "value": "Lucas Paqueta - 2+",
+      "odd": "2.20"
+     },
+     {
+      "value": "Luiz Henrique - 2+",
+      "odd": "1.44"
+     },
+     {
+      "value": "Gabriel Martinelli - 2+",
+      "odd": "1.44"
+     },
+     {
+      "value": "Matheus Cunha - 2+",
+      "odd": "1.20"
+     },
+     {
+      "value": "Danilo dos Santos - 2+",
+      "odd": "1.80"
+     },
+     {
+      "value": "Leo Pereira - 2+",
+      "odd": "3.50"
+     },
+     {
+      "value": "Casemiro - 2+",
+      "odd": "3.00"
+     },
+     {
+      "value": "Fabinho - 2+",
+      "odd": "3.75"
+     },
+     {
+      "value": "Douglas Santos - 2+",
+      "odd": "3.75"
+     },
+     {
+      "value": "Gabriel Magalhaes - 2+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Danilo da Silva - 2+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Alex Sandro - 2+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Bremer - 2+",
+      "odd": "4.33"
+     },
+     {
+      "value": "Roger Ibanez - 2+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Marquinhos - 2+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Vinicius Jr. - 3+",
+      "odd": "1.40"
+     },
+     {
+      "value": "Endrick - 3+",
+      "odd": "1.73"
+     },
+     {
+      "value": "Igor Thiago - 3+",
+      "odd": "1.67"
+     },
+     {
+      "value": "Raphinha - 3+",
+      "odd": "1.80"
+     },
+     {
+      "value": "Rayan Vitor - 3+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Lucas Paqueta - 3+",
+      "odd": "4.50"
+     },
+     {
+      "value": "Luiz Henrique - 3+",
+      "odd": "2.25"
+     },
+     {
+      "value": "Gabriel Martinelli - 3+",
+      "odd": "2.25"
+     },
+     {
+      "value": "Matheus Cunha - 3+",
+      "odd": "1.62"
+     },
+     {
+      "value": "Danilo dos Santos - 3+",
+      "odd": "3.40"
+     },
+     {
+      "value": "Leo Pereira - 3+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Casemiro - 3+",
+      "odd": "7.00"
+     },
+     {
+      "value": "Fabinho - 3+",
+      "odd": "11.00"
+     },
+     {
+      "value": "Douglas Santos - 3+",
+      "odd": "11.00"
+     },
+     {
+      "value": "Gabriel Magalhaes - 3+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Danilo da Silva - 3+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Alex Sandro - 3+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Bremer - 3+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Roger Ibanez - 3+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Marquinhos - 3+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Vinicius Jr. - 4+",
+      "odd": "1.91"
+     },
+     {
+      "value": "Endrick - 4+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Igor Thiago - 4+",
+      "odd": "2.62"
+     },
+     {
+      "value": "Raphinha - 4+",
+      "odd": "3.00"
+     },
+     {
+      "value": "Rayan Vitor - 4+",
+      "odd": "5.50"
+     },
+     {
+      "value": "Lucas Paqueta - 4+",
+      "odd": "11.00"
+     },
+     {
+      "value": "Luiz Henrique - 4+",
+      "odd": "4.00"
+     },
+     {
+      "value": "Gabriel Martinelli - 4+",
+      "odd": "4.00"
+     },
+     {
+      "value": "Matheus Cunha - 4+",
+      "odd": "2.50"
+     },
+     {
+      "value": "Danilo dos Santos - 4+",
+      "odd": "7.00"
+     },
+     {
+      "value": "Leo Pereira - 4+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Casemiro - 4+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Fabinho - 4+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Douglas Santos - 4+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Vinicius Jr. - 5+",
+      "odd": "3.00"
+     },
+     {
+      "value": "Endrick - 5+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Igor Thiago - 5+",
+      "odd": "4.50"
+     },
+     {
+      "value": "Raphinha - 5+",
+      "odd": "5.50"
+     },
+     {
+      "value": "Rayan Vitor - 5+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Lucas Paqueta - 5+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Luiz Henrique - 5+",
+      "odd": "9.00"
+     },
+     {
+      "value": "Gabriel Martinelli - 5+",
+      "odd": "9.00"
+     },
+     {
+      "value": "Matheus Cunha - 5+",
+      "odd": "4.33"
+     },
+     {
+      "value": "Danilo dos Santos - 5+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Vinicius Jr. - 6+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Endrick - 6+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Igor Thiago - 6+",
+      "odd": "9.00"
+     },
+     {
+      "value": "Raphinha - 6+",
+      "odd": "11.00"
+     },
+     {
+      "value": "Rayan Vitor - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Lucas Paqueta - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Luiz Henrique - 6+",
+      "odd": "17.00"
+     },
+     {
+      "value": "Gabriel Martinelli - 6+",
+      "odd": "17.00"
+     },
+     {
+      "value": "Matheus Cunha - 6+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Danilo dos Santos - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Vinicius Jr. - 7+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Endrick - 7+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Igor Thiago - 7+",
+      "odd": "17.00"
+     },
+     {
+      "value": "Raphinha - 7+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Rayan Vitor - 7+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Matheus Cunha - 7+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Vinicius Jr. - 8+",
+      "odd": "17.00"
+     },
+     {
+      "value": "Igor Thiago - 8+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Neymar Jr - 1+",
+      "odd": "1.04"
+     },
+     {
+      "value": "Bruno Guimaraes - 1+",
+      "odd": "1.40"
+     },
+     {
+      "value": "Neymar Jr - 2+",
+      "odd": "1.25"
+     },
+     {
+      "value": "Bruno Guimaraes - 2+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Neymar Jr - 3+",
+      "odd": "1.73"
+     },
+     {
+      "value": "Bruno Guimaraes - 3+",
+      "odd": "6.50"
+     },
+     {
+      "value": "Neymar Jr - 4+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Bruno Guimaraes - 4+",
+      "odd": "17.00"
+     },
+     {
+      "value": "Neymar Jr - 5+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Neymar Jr - 6+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Neymar Jr - 7+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Ederson Silva - 1+",
+      "odd": "1.30"
+     },
+     {
+      "value": "Ederson Silva - 2+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Ederson Silva - 3+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Ederson Silva - 4+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Ederson Silva - 5+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Matheus Cunha - 8+",
+      "odd": "21.00"
+     }
+    ]
+   },
+   {
+    "date": "2026-06-29",
+    "fixture": 1562344,
+    "book": "Bet365",
+    "marche": "Away Player Shots",
+    "valeurs": [
+     {
+      "value": "Ayase Ueda - 1+",
+      "odd": "1.12"
+     },
+     {
+      "value": "Koki Ogawa - 1+",
+      "odd": "1.18"
+     },
+     {
+      "value": "Keisuke Goto - 1+",
+      "odd": "1.20"
+     },
+     {
+      "value": "Daizen Maeda - 1+",
+      "odd": "1.30"
+     },
+     {
+      "value": "Keito Nakamura - 1+",
+      "odd": "1.18"
+     },
+     {
+      "value": "Kento Shiogai - 1+",
+      "odd": "1.20"
+     },
+     {
+      "value": "Takefusa Kubo - 1+",
+      "odd": "1.33"
+     },
+     {
+      "value": "Yuito Suzuki - 1+",
+      "odd": "1.33"
+     },
+     {
+      "value": "Ritsu Doan - 1+",
+      "odd": "1.44"
+     },
+     {
+      "value": "Junya Ito - 1+",
+      "odd": "1.44"
+     },
+     {
+      "value": "Ao Tanaka - 1+",
+      "odd": "1.57"
+     },
+     {
+      "value": "Daichi Kamada - 1+",
+      "odd": "1.50"
+     },
+     {
+      "value": "Yukinari Sugawara - 1+",
+      "odd": "2.25"
+     },
+     {
+      "value": "Kaishu Sano - 1+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Takehiro Tomiyasu - 1+",
+      "odd": "2.62"
+     },
+     {
+      "value": "Ayumu Seko - 1+",
+      "odd": "3.25"
+     },
+     {
+      "value": "Junnosuke Suzuki - 1+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Ko Itakura - 1+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Tsuyoshi Watanabe - 1+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Yuto Nagatomo - 1+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Hiroki Ito - 1+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Shogo Taniguchi - 1+",
+      "odd": "2.75"
+     },
+     {
+      "value": "Ayase Ueda - 2+",
+      "odd": "1.57"
+     },
+     {
+      "value": "Koki Ogawa - 2+",
+      "odd": "1.80"
+     },
+     {
+      "value": "Keisuke Goto - 2+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Daizen Maeda - 2+",
+      "odd": "2.25"
+     },
+     {
+      "value": "Keito Nakamura - 2+",
+      "odd": "1.80"
+     },
+     {
+      "value": "Kento Shiogai - 2+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Takefusa Kubo - 2+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Yuito Suzuki - 2+",
+      "odd": "2.38"
+     },
+     {
+      "value": "Ritsu Doan - 2+",
+      "odd": "3.00"
+     },
+     {
+      "value": "Junya Ito - 2+",
+      "odd": "3.00"
+     },
+     {
+      "value": "Ao Tanaka - 2+",
+      "odd": "3.50"
+     },
+     {
+      "value": "Daichi Kamada - 2+",
+      "odd": "3.25"
+     },
+     {
+      "value": "Yukinari Sugawara - 2+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Kaishu Sano - 2+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Takehiro Tomiyasu - 2+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Ayumu Seko - 2+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Junnosuke Suzuki - 2+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Ko Itakura - 2+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Tsuyoshi Watanabe - 2+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Yuto Nagatomo - 2+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Hiroki Ito - 2+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Shogo Taniguchi - 2+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Ayase Ueda - 3+",
+      "odd": "2.62"
+     },
+     {
+      "value": "Koki Ogawa - 3+",
+      "odd": "3.40"
+     },
+     {
+      "value": "Keisuke Goto - 3+",
+      "odd": "3.75"
+     },
+     {
+      "value": "Daizen Maeda - 3+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Keito Nakamura - 3+",
+      "odd": "3.40"
+     },
+     {
+      "value": "Kento Shiogai - 3+",
+      "odd": "3.75"
+     },
+     {
+      "value": "Takefusa Kubo - 3+",
+      "odd": "5.50"
+     },
+     {
+      "value": "Yuito Suzuki - 3+",
+      "odd": "5.50"
+     },
+     {
+      "value": "Ritsu Doan - 3+",
+      "odd": "7.00"
+     },
+     {
+      "value": "Junya Ito - 3+",
+      "odd": "7.00"
+     },
+     {
+      "value": "Ao Tanaka - 3+",
+      "odd": "10.00"
+     },
+     {
+      "value": "Daichi Kamada - 3+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Yukinari Sugawara - 3+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Kaishu Sano - 3+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Junnosuke Suzuki - 3+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Ko Itakura - 3+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Yuto Nagatomo - 3+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Ayase Ueda - 4+",
+      "odd": "5.00"
+     },
+     {
+      "value": "Koki Ogawa - 4+",
+      "odd": "7.00"
+     },
+     {
+      "value": "Keisuke Goto - 4+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Daizen Maeda - 4+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Keito Nakamura - 4+",
+      "odd": "7.00"
+     },
+     {
+      "value": "Kento Shiogai - 4+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Takefusa Kubo - 4+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Yuito Suzuki - 4+",
+      "odd": "13.00"
+     },
+     {
+      "value": "Ritsu Doan - 4+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Junya Ito - 4+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Ao Tanaka - 4+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Daichi Kamada - 4+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Ayase Ueda - 5+",
+      "odd": "11.00"
+     },
+     {
+      "value": "Koki Ogawa - 5+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Keisuke Goto - 5+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Daizen Maeda - 5+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Keito Nakamura - 5+",
+      "odd": "15.00"
+     },
+     {
+      "value": "Kento Shiogai - 5+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Takefusa Kubo - 5+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Yuito Suzuki - 5+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Ayase Ueda - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Koki Ogawa - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Keisuke Goto - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Shuto Machino - 1+",
+      "odd": "1.20"
+     },
+     {
+      "value": "Shuto Machino - 2+",
+      "odd": "1.83"
+     },
+     {
+      "value": "Shuto Machino - 3+",
+      "odd": "3.75"
+     },
+     {
+      "value": "Shuto Machino - 4+",
+      "odd": "8.00"
+     },
+     {
+      "value": "Shuto Machino - 5+",
+      "odd": "19.00"
+     },
+     {
+      "value": "Shuto Machino - 6+",
+      "odd": "21.00"
+     },
+     {
+      "value": "Ayase Ueda - 7+",
+      "odd": "21.00"
+     }
+    ]
+   }
+  ],
+  "cotes_par_equipe": [],
+  "par_equipe_disponible": false
  }
 }
