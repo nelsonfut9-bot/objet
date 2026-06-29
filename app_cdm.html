@@ -101,6 +101,7 @@
     <div class="tab" data-tab="avenir">Matchs à venir</div>
     <div class="tab" data-tab="analyse">Analyse d'un match</div>
     <div class="tab" data-tab="suivi">Suivi & fiabilité</div>
+    <div class="tab" data-tab="bankroll">Bankroll</div>
   </div>
 
   <section id="equipes">
@@ -149,6 +150,20 @@
       <p class="small muted" style="margin:0 0 8px">Équipe A = domicile, Équipe B = extérieur, Match = total des deux équipes. Chaque pari est jugé gagné/perdu séparément.</p>
       <div class="cards" id="scoreCards"></div>
       <table id="bt"><thead></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section id="bankroll" class="hidden">
+    <div class="panel">
+      <div class="secTitle" style="margin-top:0">Bankroll simulée — 200 € par pari, vraies cotes</div>
+      <p class="small muted">Pour chaque match dont on a capté les <b>vraies cotes bookmaker</b>, je place une mise fixe de <b>200 €</b> sur le côté (OVER/UNDER) recommandé par mon modèle d'avant-match (zéro lookahead), puis je règle le pari avec le résultat réel. Seules les vraies cotes sont utilisées : la bankroll se remplit au fur et à mesure que les matchs à venir (cotes déjà captées) sont joués.</p>
+      <div class="filterbar">
+        <div class="field"><label>Marché</label><select id="bkScope"><option value="all">Tous</option><option value="totals">Totaux match</option><option value="teams">Par équipe</option></select></div>
+        <div class="field"><label>Statut</label><select id="bkStatus"><option value="all">Tous</option><option value="settled">Réglés</option><option value="pending">En attente</option></select></div>
+        <div class="field" style="display:flex;align-items:flex-end"><button class="tab" id="bkExport" style="background:var(--accent2);color:#04223f;border-color:var(--accent2);width:100%">⬇ Exporter en CSV</button></div>
+      </div>
+      <div class="cards" id="bkCards"></div>
+      <table id="bk"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Bookmaker</th><th class="num">Cote</th><th class="num">Mise</th><th>Résultat</th><th class="num">Gain</th><th class="num">Bénéfice</th></tr></thead><tbody id="bkBody"></tbody></table>
     </div>
   </section>
   <footer style="color:var(--muted);font-size:11px;text-align:center;margin-top:18px">Données API-Football · mise à jour automatique quotidienne</footer>
@@ -608,7 +623,113 @@ function buildUpcoming(){
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
 function loadMatch(h,a){if(TEAMS[h])$("home").value=h;if(TEAMS[a])$("away").value=a;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","analyse","suivi"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","analyse","suivi","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+
+// ---- bankroll (mise fixe, vraies cotes uniquement) ----
+var STAKE=200;
+var MK_LABEL={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadrés (match)","Shots. Home Total":"Tirs domicile","Shots. Away Total":"Tirs extérieur","Home Total ShotOnGoal":"Tirs cadrés domicile","Away Total ShotOnGoal":"Tirs cadrés extérieur","Home Shots On Target":"Tirs cadrés domicile","Away Shots On Target":"Tirs cadrés extérieur"};
+var MK_TOTALS={"Total Shots":1,"Total ShotOnGoal":1};
+function oddsRowFor(mk){var rows=mk.rows||[];if(!rows.length)return null;var best=rows[Math.floor(rows.length/2)];if(mk.bl!=null){var bd=1e9;rows.forEach(function(r){var d=Math.abs(r[0]-mk.bl);if(d<bd){bd=d;best=r;}});}return {line:best[0],over:best[1],under:best[2]};}
+function preEstMarket(mkName,pH,pA){
+  if(!pH)return null;
+  if(mkName==="Total Shots")return pA?pH.exp+pA.exp:null;
+  if(mkName==="Total ShotOnGoal")return pA?pH.expSot+pA.expSot:null;
+  if(mkName==="Shots. Home Total")return pH.exp;
+  if(mkName==="Shots. Away Total")return pA?pA.exp:null;
+  if(mkName==="Home Total ShotOnGoal"||mkName==="Home Shots On Target")return pH.expSot;
+  if(mkName==="Away Total ShotOnGoal"||mkName==="Away Shots On Target")return pA?pA.expSot:null;
+  return null;
+}
+function realMarket(mkName,m){
+  var aTs=(m.o&&m.o.ts!=null)?m.o.ts:m.a_ts, aSot=(m.o&&m.o.sot!=null)?m.o.sot:m.a_sot;
+  if(mkName==="Total Shots")return m.ts+aTs;
+  if(mkName==="Total ShotOnGoal")return m.sot+aSot;
+  if(mkName==="Shots. Home Total")return m.ts;
+  if(mkName==="Shots. Away Total")return aTs;
+  if(mkName==="Home Total ShotOnGoal"||mkName==="Home Shots On Target")return m.sot;
+  if(mkName==="Away Total ShotOnGoal"||mkName==="Away Shots On Target")return aSot;
+  return null;
+}
+function findPlayed(h,a,date){var t=TEAMS[h];if(!t)return null;for(var i=0;i<t.matches.length;i++){var m=t.matches[i];if(m.home&&m.date===date&&m.opp===a)return m;}return null;}
+function bankrollBets(){
+  if(typeof ODDS==="undefined"||!ODDS)return [];
+  var bets=[];
+  Object.keys(ODDS).forEach(function(fid){
+    var o=ODDS[fid];if(!o||!o.markets)return;
+    var h=o.h,a=o.a,date=o.date;
+    var pH=predictAt(h,a,true,date), pA=predictAt(a,h,false,date);
+    var played=findPlayed(h,a,date);
+    var compName=(played&&played.comp)||"";
+    for(var mkName in o.markets){
+      var mk=o.markets[mkName];var row=oddsRowFor(mk);if(!row)continue;
+      var est=preEstMarket(mkName,pH,pA);if(est==null)continue;
+      var side=est>row.line?"OVER":"UNDER";var odd=side==="OVER"?row.over:row.under;
+      if(!odd||odd<1.01)continue;
+      var bet={date:date,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
+        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:odd,est:r1(est),stake:STAKE,status:"pending"};
+      if(played){
+        var real=realMarket(mkName,played);
+        if(real!=null){
+          bet.real=real;
+          if(real===row.line){bet.status="push";bet.gain=STAKE;bet.profit=0;}
+          else{var win=(side==="OVER")?(real>row.line):(real<row.line);bet.status=win?"won":"lost";bet.gain=win?r2(STAKE*odd):0;bet.profit=r2(bet.gain-STAKE);}
+        }
+      }
+      bets.push(bet);
+    }
+  });
+  bets.sort(function(x,y){return x.date<y.date?1:-1;});
+  return bets;
+}
+var _bankBets=[];
+function buildBankroll(){
+  var mScope=$("bkScope").value, status=$("bkStatus").value;
+  var bets=bankrollBets().filter(function(b){
+    if(mScope==="totals"&&!MK_TOTALS[b.market])return false;
+    if(mScope==="teams"&&MK_TOTALS[b.market])return false;
+    return true;
+  });
+  _bankBets=bets;
+  var settled=bets.filter(function(b){return b.status==="won"||b.status==="lost"||b.status==="push";});
+  var won=settled.filter(function(b){return b.status==="won";}).length;
+  var staked=settled.reduce(function(s,b){return s+b.stake;},0);
+  var gain=settled.reduce(function(s,b){return s+(b.gain||0);},0);
+  var profit=r2(gain-staked), roi=staked?r1(profit/staked*100):0;
+  var wr=settled.length?Math.round(won/settled.length*100):0;
+  var pending=bets.filter(function(b){return b.status==="pending";}).length;
+  $("bkCards").innerHTML=
+    '<div class="card '+(profit>=0?'g':'w')+'"><div class="v">'+(profit>=0?'+':'')+frn(profit)+' €</div><div class="k">Bénéfice net</div></div>'+
+    '<div class="card '+(roi>=0?'g':'w')+'"><div class="v">'+(roi>=0?'+':'')+frn(roi)+' %</div><div class="k">ROI</div></div>'+
+    '<div class="card"><div class="v">'+settled.length+'</div><div class="k">Paris réglés</div></div>'+
+    '<div class="card"><div class="v">'+wr+'%</div><div class="k">Taux de réussite</div></div>'+
+    '<div class="card"><div class="v">'+frn(staked)+' €</div><div class="k">Total misé</div></div>'+
+    '<div class="card"><div class="v">'+pending+'</div><div class="k">En attente</div></div>';
+  var rowsToShow=bets.filter(function(b){if(status==="settled")return b.status!=="pending";if(status==="pending")return b.status==="pending";return true;});
+  var body=rowsToShow.map(function(b){
+    var stPill=b.status==="won"?'<span class="pill W">gagné</span>':b.status==="lost"?'<span class="pill L">perdu</span>':b.status==="push"?'<span class="pill D">remb.</span>':'<span class="pill D">en attente</span>';
+    var gainTxt=b.status==="pending"?"—":frn(b.gain);
+    var profTxt=b.status==="pending"?"—":((b.profit>=0?'+':'')+frn(b.profit));
+    return '<tr><td class="small muted">'+dm(b.date)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num">'+frn(b.odd)+'</td><td class="num">'+b.stake+'</td><td>'+stPill+'</td><td class="num">'+gainTxt+'</td><td class="num">'+profTxt+'</td></tr>';
+  }).join("");
+  $("bkBody").innerHTML=body||'<tr><td colspan="9" class="muted" style="text-align:center;padding:18px">Aucun pari avec de vraies cotes pour ce filtre. La bankroll se remplira quand les matchs à venir (cotes déjà captées) auront été joués.</td></tr>';
+}
+function exportBankrollCSV(){
+  var bets=(_bankBets&&_bankBets.length)?_bankBets:bankrollBets();
+  var sep=";";
+  function q(s){s=String(s==null?"":s);if(/[";\n]/.test(s))s='"'+s.replace(/"/g,'""')+'"';return s;}
+  var head=["Date","Sport","Compétition","Match","Intitulé du pari","Bookmaker","Cote","Mise","Gain","Bénéfice","Résultat"];
+  var lines=[head.join(sep)];
+  bets.forEach(function(b){
+    if(b.status==="pending")return;
+    var res=b.status==="won"?"Gagné":b.status==="lost"?"Perdu":"Remboursé";
+    lines.push([dmy(b.date),"Football",b.comp||"",fr(b.home)+" - "+fr(b.away),b.label,b.book,frn(b.odd),b.stake,frn(b.gain),frn(b.profit),res].map(q).join(sep));
+  });
+  if(lines.length<2){alert("Aucun pari réglé à exporter pour l'instant.");return;}
+  var csv="﻿"+lines.join("\r\n");
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  var url=URL.createObjectURL(blob);
+  var aEl=document.createElement("a");aEl.href=url;aEl.download="bankroll_paris.csv";document.body.appendChild(aEl);aEl.click();document.body.removeChild(aEl);URL.revokeObjectURL(url);
+}
 window.addEventListener("DOMContentLoaded",function(){
   if(typeof TEAMS==="undefined"||!Object.keys(TEAMS).length){
     $("dataInfo").className="err";$("dataInfo").innerHTML="Aucune donnée pour l'instant. La collecte automatique remplit la base — reviens d'ici quelques heures.";return;
@@ -622,11 +743,13 @@ window.addEventListener("DOMContentLoaded",function(){
   });});
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest(); buildBankroll();
   $("q").addEventListener("input",renderTeamList);
   $("fcomp").addEventListener("change",renderTeamList);
   $("fseason").addEventListener("change",renderTeamList);
   ["btTeam","btComp","btSeason","btMetric","btScope"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
+  ["bkScope","bkStatus"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
+  $("bkExport").addEventListener("click",exportBankrollCSV);
   document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});

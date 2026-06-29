@@ -98,7 +98,6 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
             upcoming_raw[fid]={"date":fx["fixture"]["date"][:10],"time":fx["fixture"]["date"],"h":h,"a":a,"lname":lg.get("name","")}
 
 ODDSFILE="odds.json"
-ODDS_HIST_FILE="odds_history.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target"}
 def _parse_ou(values):
@@ -129,7 +128,11 @@ def _balanced(rows):
             t=(a[1]-0.5)/(a[1]-b[1]) if a[1]!=b[1] else 0.0
             return round(a[0]+t*(b[0]-a[0]),1)
     return None
-def _extract_markets(resp):
+def _fetch_markets(fid, used):
+    """Recupere les marches tirs/tirs cadres pour une fixture. None si quota/stop."""
+    try: resp=api_get("/odds",{"fixture":fid},used)
+    except Stop: return None
+    time.sleep(SLEEP)
     markets={}
     for blk in resp:
         for bk in blk.get("bookmakers",[]):
@@ -143,36 +146,21 @@ def _extract_markets(resp):
                         markets[nm]={"book":bname,"rows":rows,"bl":_balanced(rows)}
     return markets
 
-def collect_odds(upcoming_raw, used, limit=40):
+def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=30):
+    """Cotes des matchs a venir (rafraichies a chaque run pour approcher les cotes de cloture)
+    + cotes des matchs recents joues, captees une seule fois (seed historique de la bankroll)."""
     odds=load_json(ODDSFILE,{})
-    items=sorted(upcoming_raw.items(), key=lambda kv: kv[1].get("date",""))[:limit]
-    for fid,u in items:
+    up_items=sorted(upcoming_raw.items(), key=lambda kv: kv[1].get("date",""))[:up_limit]
+    # matchs recents joues : seulement ceux dont on n'a pas encore les cotes
+    rc_items=[it for it in sorted(recent_ft.items(), key=lambda kv: kv[1].get("date",""), reverse=True) if it[0] not in odds][:rc_limit]
+    for fid,u in up_items+rc_items:
         if not can_continue(used): break
-        try: resp=api_get("/odds",{"fixture":fid},used)
-        except Stop: break
-        time.sleep(SLEEP)
-        markets=_extract_markets(resp)
-        if markets:
+        markets=_fetch_markets(fid, used)
+        if markets is None: break
+        if markets:  # on n'ecrase jamais des cotes existantes par du vide (match deja joue)
             odds[fid]={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets}
     json.dump(odds,open(ODDSFILE,"w",encoding="utf-8"))
     return odds
-
-def collect_odds_history(matches, used, limit=20):
-    """Recupere les cotes pre-match des matchs deja joues (pour backtest vs book)."""
-    hist=load_json(ODDS_HIST_FILE,{})
-    pending=sorted(
-        [(fid,m) for fid,m in matches.items() if fid not in hist],
-        key=lambda x:x[1].get("date",""), reverse=True
-    )[:limit]
-    for fid,m in pending:
-        if not can_continue(used): break
-        try: resp=api_get("/odds",{"fixture":fid},used)
-        except Stop: break
-        time.sleep(SLEEP)
-        markets=_extract_markets(resp)
-        hist[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date"),"markets":markets}
-    json.dump(hist,open(ODDS_HIST_FILE,"w",encoding="utf-8"))
-    return hist
 
 def run():
     if not API_KEY: print("ERREUR : secret API_FOOTBALL_KEY manquant."); sys.exit(1)
@@ -180,7 +168,6 @@ def run():
     progress.setdefault("priority_teams",{}); progress.setdefault("fixtures_done",{})
     progress.setdefault("pending_fixtures",[]); progress.setdefault("upcoming_raw",{})
     matches=load_json(MATCHES,{}); used=[0]; odds=load_json(ODDSFILE,{})
-    odds_hist=load_json(ODDS_HIST_FILE,{})
     print(datetime.datetime.now(datetime.timezone.utc).strftime("== Run %d/%m %H:%M UTC =="))
     if matches:
         sample=next(iter(matches.values()))
@@ -234,37 +221,23 @@ def run():
                 "h":it["h"],"a":it["a"],"gh":it["gh"],"ga":it["ga"],
                 "H":parse_side(per.get(it["h"],{})),"A":parse_side(per.get(it["a"],{}))}
             time.sleep(SLEEP)
-        odds=collect_odds(progress["upcoming_raw"], used)
-        odds_hist=collect_odds_history(matches, used, limit=15)
+        # nettoie les matchs deja joues de la liste "a venir"
+        for fid in [k for k in progress["upcoming_raw"] if k in matches]:
+            progress["upcoming_raw"].pop(fid, None)
+        # matchs recents joues (12 derniers jours) -> tentative de captation des cotes pour la bankroll
+        recent_ft={}
+        try: cutoff=(datetime.date.today()-datetime.timedelta(days=12)).isoformat()
+        except: cutoff="0000-00-00"
+        for fid,m in matches.items():
+            if m.get("date","")>=cutoff:
+                recent_ft[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date")}
+        odds=collect_odds(progress["upcoming_raw"], recent_ft, used)
     except Stop:
         print("  Pause (quota/plafond). Reprise au prochain run.")
-        odds_hist=load_json(ODDS_HIST_FILE,{})
     progress["pending_fixtures"]=[it for it in progress["pending_fixtures"] if it["fid"] not in matches]
-    aggregate_and_write(matches, progress["upcoming_raw"], odds, odds_hist)
+    aggregate_and_write(matches, progress["upcoming_raw"], odds)
     json.dump(progress,open(PROGRESS,"w",encoding="utf-8")); json.dump(matches,open(MATCHES,"w",encoding="utf-8"))
     print(f"  Requetes: {used[0]} | matchs: {len(matches)} | attente: {len(progress['pending_fixtures'])}")
-
-def run_odds_only():
-    """Rafraichit uniquement les cotes des matchs a venir (cron horaire)."""
-    if not API_KEY: print("ERREUR : secret API_FOOTBALL_KEY manquant."); sys.exit(1)
-    progress=load_json(PROGRESS,{}); matches=load_json(MATCHES,{})
-    upcoming=progress.get("upcoming_raw",{})
-    used=[0]
-    print(datetime.datetime.now(datetime.timezone.utc).strftime("== Run cotes %d/%m %H:%M UTC =="))
-    odds=collect_odds(upcoming, used, limit=60)
-    odds_hist=load_json(ODDS_HIST_FILE,{})
-    aggregate_and_write(matches, upcoming, odds, odds_hist)
-    print(f"  Requetes: {used[0]} | cotes a venir: {len(odds)}")
-
-def run_odds_history():
-    """Backfill des cotes historiques pour le backtest vs bookmaker."""
-    if not API_KEY: print("ERREUR : secret API_FOOTBALL_KEY manquant."); sys.exit(1)
-    matches=load_json(MATCHES,{}); progress=load_json(PROGRESS,{})
-    used=[0]
-    print(datetime.datetime.now(datetime.timezone.utc).strftime("== Run historique cotes %d/%m %H:%M UTC =="))
-    odds_hist=collect_odds_history(matches, used, limit=40)
-    aggregate_and_write(matches, progress.get("upcoming_raw",{}), load_json(ODDSFILE,{}), odds_hist)
-    print(f"  Requetes: {used[0]} | historique: {len(odds_hist)} fixtures")
 
 def rec(opp,comp,season,home,gf,ga,me,opst):
     res="W" if gf>ga else ("D" if gf==ga else "L")
@@ -275,12 +248,12 @@ def rec(opp,comp,season,home,gf,ga,me,opst):
     d["o"]={k:opst.get(k,0) for k in STK}
     return d
 
-def aggregate_and_write(matches, upcoming_raw, odds=None, odds_hist=None):
+def aggregate_and_write(matches, upcoming_raw, odds=None):
     byteam={}; comps=set()
     for fid,m in matches.items():
         comps.add(m.get("lname",""))
-        r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]; r1["fid"]=fid
-        r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]; r2["fid"]=fid
+        r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]
+        r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]
         byteam.setdefault(m["h"],[]).append(r1)
         byteam.setdefault(m["a"],[]).append(r2)
     TEAMS={}
@@ -299,16 +272,9 @@ def aggregate_and_write(matches, upcoming_raw, odds=None, odds_hist=None):
         "var LEAGUE_AVG = "+json.dumps(la)+";\n"
         "var COMPS = "+json.dumps(comps,ensure_ascii=False)+";\n"
         "var TEAMS = "+json.dumps(TEAMS,ensure_ascii=False)+";\n"
-        "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n"
-        "var ODDS_HIST = "+json.dumps(odds_hist or {},ensure_ascii=False)+";\n")
+        "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n")
     open(OUTPUT,"w",encoding="utf-8").write(payload)
-    hist_with_markets=sum(1 for v in (odds_hist or {}).values() if v.get("markets"))
-    print(f"  -> {OUTPUT}: {len(TEAMS)} equipes, {len(comps)} competitions, {hist_with_markets} cotes historiques.")
+    print(f"  -> {OUTPUT}: {len(TEAMS)} equipes, {len(comps)} competitions.")
 
 if __name__=="__main__":
-    if "--odds-only" in sys.argv:
-        run_odds_only()
-    elif "--odds-history" in sys.argv:
-        run_odds_history()
-    else:
-        run()
+    run()
