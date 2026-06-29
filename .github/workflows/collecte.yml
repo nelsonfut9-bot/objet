@@ -1,12 +1,21 @@
-name: Collecte horaire
+name: Collecte automatique
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    # GitHub sature les crons a pile l'heure : on vise des minutes decalees,
+    # 3 tentatives par heure pour fiabiliser le declenchement.
+    - cron: "7 * * * *"
+    - cron: "27 * * * *"
+    - cron: "47 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+
+# jamais deux collectes en meme temps (evite les conflits de push)
+concurrency:
+  group: collecte-objet
+  cancel-in-progress: false
 
 jobs:
   collecte:
@@ -27,4 +36,5 @@ jobs:
           git config user.email "bot@users.noreply.github.com"
           git add -A
           git commit -m "MAJ donnees" || echo "Rien a committer"
+          git pull --rebase --autostash || true
           git push
