@@ -146,8 +146,11 @@
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
         <div class="field"><label>Saison</label><select id="btSeason"></select></div>
+        <div class="field" style="max-width:160px"><label>Du</label><input type="date" id="btFrom"></div>
+        <div class="field" style="max-width:160px"><label>Au</label><input type="date" id="btTo"></div>
+        <div class="field" style="max-width:120px;display:flex;align-items:flex-end"><button class="tab" id="btReset" style="width:100%">↺ Tout</button></div>
       </div>
-      <p class="small muted" style="margin:0 0 8px">Équipe A = domicile, Équipe B = extérieur, Match = total des deux équipes. Chaque pari est jugé gagné/perdu séparément.</p>
+      <p class="small muted" style="margin:0 0 8px">Équipe A = domicile, Équipe B = extérieur, Match = total des deux équipes. Chaque pari est jugé gagné/perdu séparément. Choisis une plage de dates (Du / Au) pour voir les % évoluer sur la période.</p>
       <div class="cards" id="scoreCards"></div>
       <table id="bt"><thead></thead><tbody></tbody></table>
     </div>
@@ -160,6 +163,9 @@
       <div class="filterbar">
         <div class="field"><label>Marché</label><select id="bkScope"><option value="all">Tous</option><option value="totals">Totaux match</option><option value="teams">Par équipe</option></select></div>
         <div class="field"><label>Statut</label><select id="bkStatus"><option value="all">Tous</option><option value="settled">Réglés</option><option value="pending">En attente</option></select></div>
+        <div class="field" style="max-width:160px"><label>Du</label><input type="date" id="bkFrom"></div>
+        <div class="field" style="max-width:160px"><label>Au</label><input type="date" id="bkTo"></div>
+        <div class="field" style="max-width:110px;display:flex;align-items:flex-end"><button class="tab" id="bkReset" style="width:100%">↺ Tout</button></div>
         <div class="field" style="display:flex;align-items:flex-end"><button class="tab" id="bkExport" style="background:var(--accent2);color:#04223f;border-color:var(--accent2);width:100%">⬇ Exporter en CSV</button></div>
       </div>
       <div class="cards" id="bkCards"></div>
@@ -190,6 +196,7 @@ function esc(s){return String(s).replace(/"/g,"&quot;");}
 function dmy(d){return d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4);}
 function dm(d){return d.slice(8,10)+"/"+d.slice(5,7);}
 function frTime(iso){if(!iso)return "";try{var d=new Date(iso);if(isNaN(d))return "";return d.toLocaleTimeString("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit"});}catch(e){return "";}}
+function timeTag(dt){var t=frTime(dt);return t?' · '+t:'';}
 function mean(a){a=a.filter(function(x){return x!=null;});return a.length?a.reduce(function(s,x){return s+x;},0)/a.length:0;}
 function std(a){a=a.filter(function(x){return x!=null;});if(a.length<2)return 1.7;var m=mean(a);return Math.sqrt(a.reduce(function(s,x){return s+(x-m)*(x-m);},0)/a.length);}
 function erf(x){var t=1/(1+0.3275911*Math.abs(x));var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
@@ -259,7 +266,7 @@ function showTeam(name,comp,season){
   var compOpts='<option value="all">Toutes compétitions</option>'+allComps.map(function(c){return '<option value="'+esc(c)+'"'+(c===comp?' selected':'')+'>'+c+'</option>';}).join("");
   var seasonOpts='<option value="all">Toutes saisons</option>'+allSeasons.map(function(s){return '<option value="'+s+'"'+(String(s)===String(season)?' selected':'')+'>'+s+'</option>';}).join("");
   var matchRows=ms.map(function(m){
-    return '<tr class="click" data-d="'+m.date+'" data-o="'+esc(m.opp)+'"><td class="small muted">'+dm(m.date)+'</td>'+
+    return '<tr class="click" data-d="'+m.date+'" data-o="'+esc(m.opp)+'"><td class="small muted">'+dm(m.date)+timeTag(m.dt)+'</td>'+
       '<td>'+(m.home?'':'<span class="muted">@</span> ')+fr(m.opp)+' <span class="compTag">· '+m.comp+'</span></td>'+
       '<td class="num">'+m.gf+'–'+m.ga+'</td><td><span class="pill '+m.res+'">'+m.res+'</span></td>'+
       '<td class="num">'+m.ts+'</td><td class="num">'+m.sot+'</td><td><span class="back">détail &rsaquo;</span></td></tr>';
@@ -410,7 +417,7 @@ function openMatch(name,date,opp){
     if(pmO){pmHTML+='<div class="prebox"><div class="small muted" style="margin-bottom:4px"><b>'+fr(opp)+'</b> — calculée avec ses '+pmO.n+' matchs joués AVANT le '+dmy(date)+'.</div>'+preLine("Tirs",pmO.exp,pmO.recoShots,oppTs)+preLine("Tirs cadrés",pmO.expSot,pmO.recoSot,oppSot)+'</div>';}
   }
   $("modal").innerHTML='<div class="box"><span class="mclose" id="mClose">×</span>'+
-    '<div class="mmeta" style="margin-bottom:4px">'+compLabel+saison+' · '+dmy(date)+lieu+'</div>'+
+    '<div class="mmeta" style="margin-bottom:4px">'+compLabel+saison+' · '+dmy(date)+timeTag(me.dt)+lieu+'</div>'+
     '<div class="mh"><div class="tm" style="text-align:right">'+fr(name)+'</div>'+
       '<div class="sc">'+me.gf+' – '+me.ga+'</div>'+
       '<div class="tm" style="text-align:left">'+fr(opp)+'</div></div>'+
@@ -535,6 +542,7 @@ function btCell(rc,real){
 }
 function buildBacktest(){
   var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value, scope=$("btScope").value;
+  var fFrom=$("btFrom").value, fTo=$("btTo").value;
   var unit=metric==="sot"?"tirs cadrés":"tirs";
   var showA=scope!=="match", showB=scope!=="match", showM=scope!=="teams";
   var rows=[];
@@ -544,6 +552,8 @@ function buildBacktest(){
       if(!m.home)return;
       if(fComp&&fComp!=="all"&&m.comp!==fComp)return;
       if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
+      if(fFrom&&m.date<fFrom)return;
+      if(fTo&&m.date>fTo)return;
       var pmH=predictAt(n,m.opp,true,m.date); if(!pmH)return;
       var pmA=predictAt(m.opp,n,false,m.date);
       var rcH=metric==="sot"?pmH.recoSot:pmH.recoShots;
@@ -556,7 +566,7 @@ function buildBacktest(){
         rcM=recoTotal(eH,sdH,eA,sdA).rc;
         realM=(realH!=null&&realA!=null)?(realH+realA):null;
       }
-      rows.push({date:m.date,name:n,opp:m.opp,rcH:rcH,realH:realH,rcA:rcA,realA:realA,rcM:rcM,realM:realM});
+      rows.push({date:m.date,dt:m.dt,name:n,opp:m.opp,rcH:rcH,realH:realH,rcA:rcA,realA:realA,rcM:rcM,realM:realM});
     });
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
@@ -570,7 +580,7 @@ function buildBacktest(){
   document.querySelector("#bt thead").innerHTML=th;
   var okA=0,nA=0,okB=0,nB=0,okM=0,nM=0;
   var body=rows.map(function(r){
-    var tr='<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+'</td><td>'+fr(r.name)+' <span class="muted">–</span> '+fr(r.opp)+'</td>';
+    var tr='<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+timeTag(r.dt)+'</td><td>'+fr(r.name)+' <span class="muted">–</span> '+fr(r.opp)+'</td>';
     if(showA){tr+=btCell(r.rcH,r.realH);var ja=judge(r.realH,r.rcH);if(ja!=null){nA++;okA+=ja;}}
     if(showB){tr+=btCell(r.rcA,r.realA);var jb=judge(r.realA,r.rcA);if(jb!=null){nB++;okB+=jb;}}
     if(showM){tr+=btCell(r.rcM,r.realM);var jm=judge(r.realM,r.rcM);if(jm!=null){nM++;okM+=jm;}}
@@ -665,7 +675,7 @@ function bankrollBets(){
       var est=preEstMarket(mkName,pH,pA);if(est==null)continue;
       var side=est>row.line?"OVER":"UNDER";var odd=side==="OVER"?row.over:row.under;
       if(!odd||odd<1.01)continue;
-      var bet={date:date,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
+      var bet={date:date,dt:(played&&played.dt)||null,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
         label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:odd,est:r1(est),stake:STAKE,status:"pending"};
       if(played){
         var real=realMarket(mkName,played);
@@ -683,10 +693,12 @@ function bankrollBets(){
 }
 var _bankBets=[];
 function buildBankroll(){
-  var mScope=$("bkScope").value, status=$("bkStatus").value;
+  var mScope=$("bkScope").value, status=$("bkStatus").value, fFrom=$("bkFrom").value, fTo=$("bkTo").value;
   var bets=bankrollBets().filter(function(b){
     if(mScope==="totals"&&!MK_TOTALS[b.market])return false;
     if(mScope==="teams"&&MK_TOTALS[b.market])return false;
+    if(fFrom&&b.date<fFrom)return false;
+    if(fTo&&b.date>fTo)return false;
     return true;
   });
   _bankBets=bets;
@@ -709,7 +721,7 @@ function buildBankroll(){
     var stPill=b.status==="won"?'<span class="pill W">gagné</span>':b.status==="lost"?'<span class="pill L">perdu</span>':b.status==="push"?'<span class="pill D">remb.</span>':'<span class="pill D">en attente</span>';
     var gainTxt=b.status==="pending"?"—":frn(b.gain);
     var profTxt=b.status==="pending"?"—":((b.profit>=0?'+':'')+frn(b.profit));
-    return '<tr><td class="small muted">'+dm(b.date)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num">'+frn(b.odd)+'</td><td class="num">'+b.stake+'</td><td>'+stPill+'</td><td class="num">'+gainTxt+'</td><td class="num">'+profTxt+'</td></tr>';
+    return '<tr><td class="small muted">'+dm(b.date)+timeTag(b.dt)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num">'+frn(b.odd)+'</td><td class="num">'+b.stake+'</td><td>'+stPill+'</td><td class="num">'+gainTxt+'</td><td class="num">'+profTxt+'</td></tr>';
   }).join("");
   $("bkBody").innerHTML=body||'<tr><td colspan="9" class="muted" style="text-align:center;padding:18px">Aucun pari avec de vraies cotes pour ce filtre. La bankroll se remplira quand les matchs à venir (cotes déjà captées) auront été joués.</td></tr>';
 }
@@ -747,10 +759,12 @@ window.addEventListener("DOMContentLoaded",function(){
   $("q").addEventListener("input",renderTeamList);
   $("fcomp").addEventListener("change",renderTeamList);
   $("fseason").addEventListener("change",renderTeamList);
-  ["btTeam","btComp","btSeason","btMetric","btScope"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
-  ["bkScope","bkStatus"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
+  ["btTeam","btComp","btSeason","btMetric","btScope","btFrom","btTo"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
+  $("btReset").addEventListener("click",function(){$("btFrom").value="";$("btTo").value="";buildBacktest();});
+  ["bkScope","bkStatus","bkFrom","bkTo"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
+  $("bkReset").addEventListener("click",function(){$("bkFrom").value="";$("bkTo").value="";buildBankroll();});
   $("bkExport").addEventListener("click",exportBankrollCSV);
-  document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});
+  document.querySelectorAll(".tabs .tab").forEach(function(t){t.addEventListener("click",function(){if(t.dataset.tab)selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});
 });

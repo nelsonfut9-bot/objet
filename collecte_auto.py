@@ -91,7 +91,7 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
         h=fx["teams"]["home"]["name"]; a=fx["teams"]["away"]["name"]
         if st=="FT":
             if fid in matches: continue
-            pending.append({"fid":fid,"date":fx["fixture"]["date"][:10],"h":h,"a":a,
+            pending.append({"fid":fid,"date":fx["fixture"]["date"][:10],"dt":fx["fixture"]["date"],"h":h,"a":a,
                 "league":str(lid),"lname":lg.get("name",""),"season":lg.get("season",""),
                 "gh":fx.get("goals",{}).get("home") or 0,"ga":fx.get("goals",{}).get("away") or 0,"prio":prio})
         elif st in ("NS","TBD"):
@@ -146,13 +146,17 @@ def _fetch_markets(fid, used):
                         markets[nm]={"book":bname,"rows":rows,"bl":_balanced(rows)}
     return markets
 
-def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=30):
+def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=40):
     """Cotes des matchs a venir (rafraichies a chaque run pour approcher les cotes de cloture)
-    + cotes des matchs recents joues, captees une seule fois (seed historique de la bankroll)."""
+    + cotes des matchs recents joues, captees une seule fois (seed historique de la bankroll).
+    Les matchs de Coupe du Monde sont traites en priorite."""
     odds=load_json(ODDSFILE,{})
     up_items=sorted(upcoming_raw.items(), key=lambda kv: kv[1].get("date",""))[:up_limit]
-    # matchs recents joues : seulement ceux dont on n'a pas encore les cotes
-    rc_items=[it for it in sorted(recent_ft.items(), key=lambda kv: kv[1].get("date",""), reverse=True) if it[0] not in odds][:rc_limit]
+    # matchs recents joues sans cotes : Coupe du Monde d'abord, puis du plus recent au plus ancien
+    cand=[(fid,u) for fid,u in recent_ft.items() if fid not in odds]
+    cand.sort(key=lambda x: x[1].get("date",""), reverse=True)
+    cand.sort(key=lambda x: 0 if x[1].get("wc") else 1)
+    rc_items=cand[:rc_limit]
     for fid,u in up_items+rc_items:
         if not can_continue(used): break
         markets=_fetch_markets(fid, used)
@@ -217,20 +221,26 @@ def run():
                 dd={}
                 for s in blk["statistics"]: dd[s["type"]]=s["value"]
                 per[blk["team"]["name"]]=dd
-            matches[it["fid"]]={"date":it["date"],"lid":it["league"],"lname":it["lname"],"season":it["season"],
+            matches[it["fid"]]={"date":it["date"],"dt":it.get("dt"),"lid":it["league"],"lname":it["lname"],"season":it["season"],
                 "h":it["h"],"a":it["a"],"gh":it["gh"],"ga":it["ga"],
                 "H":parse_side(per.get(it["h"],{})),"A":parse_side(per.get(it["a"],{}))}
             time.sleep(SLEEP)
         # nettoie les matchs deja joues de la liste "a venir"
         for fid in [k for k in progress["upcoming_raw"] if k in matches]:
             progress["upcoming_raw"].pop(fid, None)
-        # matchs recents joues (12 derniers jours) -> tentative de captation des cotes pour la bankroll
+        # matchs recents joues -> tentative de captation des cotes pour la bankroll
+        # fenetre large pour la Coupe du Monde (en cours), plus courte pour le reste
         recent_ft={}
-        try: cutoff=(datetime.date.today()-datetime.timedelta(days=12)).isoformat()
-        except: cutoff="0000-00-00"
+        try:
+            cutoff=(datetime.date.today()-datetime.timedelta(days=12)).isoformat()
+            cutoff_wc=(datetime.date.today()-datetime.timedelta(days=90)).isoformat()
+        except:
+            cutoff="0000-00-00"; cutoff_wc="0000-00-00"
         for fid,m in matches.items():
-            if m.get("date","")>=cutoff:
-                recent_ft[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date")}
+            d=m.get("date",""); ln=(m.get("lname") or "")
+            iswc=(str(m.get("lid"))=="1") or ("World Cup" in ln) or ("Coupe du Monde" in ln)
+            if (iswc and d>=cutoff_wc) or d>=cutoff:
+                recent_ft[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date"),"wc":iswc}
         odds=collect_odds(progress["upcoming_raw"], recent_ft, used)
     except Stop:
         print("  Pause (quota/plafond). Reprise au prochain run.")
@@ -252,8 +262,8 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
     byteam={}; comps=set()
     for fid,m in matches.items():
         comps.add(m.get("lname",""))
-        r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]
-        r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]
+        r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]; r1["dt"]=m.get("dt")
+        r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]; r2["dt"]=m.get("dt")
         byteam.setdefault(m["h"],[]).append(r1)
         byteam.setdefault(m["a"],[]).append(r2)
     TEAMS={}
