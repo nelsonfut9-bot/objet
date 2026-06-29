@@ -180,6 +180,14 @@ def run():
     progress=load_json(PROGRESS,{})
     progress.setdefault("priority_teams",{}); progress.setdefault("fixtures_done",{})
     progress.setdefault("pending_fixtures",[]); progress.setdefault("upcoming_raw",{})
+    # one-time : re-tente les championnats de clubs (marques "faits" auparavant mais revenus vides)
+    if not progress.get("clubs_retry_v4"):
+        _club_ids=set(str(_l) for _l,_lab,_c,_s in COMPETITIONS if _c=="club")
+        for _k in list(progress.get("fixtures_done",{}).keys()):
+            if _k.split("_")[0] in _club_ids:
+                progress["fixtures_done"].pop(_k,None)
+        progress["clubs_retry_v4"]=True
+        print("  Reset des championnats de clubs : re-collecte forcee.")
     matches=load_json(MATCHES,{}); used=[0]; odds=load_json(ODDSFILE,{})
     print(datetime.datetime.now(datetime.timezone.utc).strftime("== Run %d/%m %H:%M UTC =="))
     if matches:
@@ -220,7 +228,9 @@ def run():
             if not can_continue(used): raise Stop()
             resp=api_get("/fixtures",params,used)
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],lid,prio)
-            progress["fixtures_done"][key]=True; time.sleep(SLEEP)
+            # ne valide la cle QUE si des matchs sont revenus (sinon on retentera au prochain run)
+            if resp: progress["fixtures_done"][key]=True
+            time.sleep(SLEEP)
         seen=set(); pend=[]
         for it in progress["pending_fixtures"]:
             if it["fid"] in matches or it["fid"] in seen: continue
