@@ -1,0 +1,30 @@
+name: Historique cotes backtest
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Backfill cotes passees
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: python collecte_auto.py --odds-history
+      - name: Publier
+        run: |
+          git config user.name "collecte-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -m "MAJ historique cotes" || echo "Rien a committer"
+          git push

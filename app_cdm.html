@@ -151,12 +151,13 @@
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
         <div class="field"><label>Saison</label><select id="btSeason"></select></div>
         <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option></select></div>
+        <div class="field"><label>Source du conseil</label><select id="btMode"><option value="model">Mon modèle (ligne statistique)</option><option value="book">Vs bookmaker (cotes réelles)</option></select></div>
       </div>
       <div class="cards" id="scoreCards"></div>
       <table id="bt"><thead><tr><th>Date</th><th>Match</th><th>Conseil</th><th class="num">Estim.</th><th class="num">Réel</th><th>Pari</th></tr></thead><tbody></tbody></table>
     </div>
   </section>
-  <footer style="color:var(--muted);font-size:11px;text-align:center;margin-top:18px">Données API-Football · mise à jour automatique quotidienne</footer>
+  <footer style="color:var(--muted);font-size:11px;text-align:center;margin-top:18px">Données API-Football · collecte quotidienne + rafraîchissement horaire des cotes</footer>
 </div>
 
 <div id="modal" class="modal hidden"></div>
@@ -192,6 +193,7 @@ var C={champ:{l:"Championnat",m:1.0},ucl:{l:"Ligue des Champions",m:1.03},uel:{l
 var CORDER=["champ","ucl","uel","coupe","wc","euro","nl","amical"];
 if(typeof LEAGUE_AVG==="undefined")var LEAGUE_AVG=12.5;
 if(typeof COMPS==="undefined")var COMPS=[];
+if(typeof ODDS_HIST==="undefined")var ODDS_HIST={};
 var $=function(id){return document.getElementById(id);};
 
 // stats affichées dans le détail de match (clé, libellé, décimales)
@@ -392,15 +394,26 @@ function openMatch(name,date,opp){
   var lieu=me.home?"":" (extérieur)";
   var bars=DETAIL_STATS.map(function(s){return statBar(s[1],me[s[0]]==null?null:me[s[0]],oppVal(me,orec,s[0]),s[2]);}).join("");
   var note=orec?"":'<div class="small muted" style="text-align:center;margin-top:10px">Stats adverses partielles (l’équipe adverse n’est pas dans la base détaillée).</div>';
-  var pm=predictAt(name,opp,me.home,date), pmHTML="";
+  var pm=predictAt(name,opp,me.home,date), pmHTML="", bookHTML="";
   if(pm){pmHTML='<div class="secTitle" style="margin-top:6px">Ma prédiction d avant-match (sans avoir vu ce match)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Calculée uniquement avec les '+pm.n+' matchs de '+fr(name)+' joués AVANT le '+dmy(date)+'.</div>'+preLine("Tirs",pm.exp,pm.recoShots,me.ts)+preLine("Tirs cadrés",pm.expSot,pm.recoSot,me.sot)+'</div>';}
+  var mk=histOdds(me.fid);
+  if(mk&&mk.markets){
+    var br=bookReco(pm?pm.exp:null,mk,teamMarket(me.home,"ts"));
+    var bc=bookReco(pm?pm.expSot:null,mk,teamMarket(me.home,"sot"));
+    if(br||bc){
+      bookHTML='<div class="secTitle">Cotes bookmaker enregistrées (avant match)</div><div class="prebox">';
+      if(br){var bo=br.side==="over", bh=(me.ts>br.line)===bo; bookHTML+='<div class="ln"><span>Ligne tirs '+fr(name)+' : <b>'+frn(br.line)+'</b> ('+(br.book||"book")+') — conseil <b>'+(bo?"OVER":"UNDER")+'</b></span><span>réel '+me.ts+' '+(bh?'<span class="pill W">✓</span>':'<span class="pill L">✗</span>')+'</span></div>';}
+      if(bc){var co=bc.side==="over", ch=(me.sot>bc.line)===co; bookHTML+='<div class="ln"><span>Ligne cadrés '+fr(name)+' : <b>'+frn(bc.line)+'</b> ('+(bc.book||"book")+') — conseil <b>'+(co?"OVER":"UNDER")+'</b></span><span>réel '+me.sot+' '+(ch?'<span class="pill W">✓</span>':'<span class="pill L">✗</span>')+'</span></div>';}
+      bookHTML+='</div>';
+    }
+  }
   $("modal").innerHTML='<div class="box"><span class="mclose" id="mClose">×</span>'+
     '<div class="mmeta" style="margin-bottom:4px">'+compLabel+saison+' · '+dmy(date)+lieu+'</div>'+
     '<div class="mh"><div class="tm" style="text-align:right">'+fr(name)+'</div>'+
       '<div class="sc">'+me.gf+' – '+me.ga+'</div>'+
       '<div class="tm" style="text-align:left">'+fr(opp)+'</div></div>'+
     '<div class="legend"><span class="lg">■ <b>'+fr(name)+'</b></span><span class="rg">■ <b>'+fr(opp)+'</b></span></div>'+
-    pmHTML+bars+note+'</div>';
+    pmHTML+bookHTML+bars+note+'</div>';
   $("modal").classList.remove("hidden");
   $("mClose").addEventListener("click",closeModal);
 }
@@ -437,6 +450,29 @@ function findOdds(home,away){
   for(var fid in ODDS){var o=ODDS[fid];
     if(o&&o.h===home&&o.a===away){if(!best||o.date<best.date)best=o;}}
   return best;
+}
+function histOdds(fid){return (fid&&typeof ODDS_HIST!=="undefined"&&ODDS_HIST)?ODDS_HIST[fid]:null;}
+function teamMarket(isHome,metric){
+  if(metric==="sot")return isHome?"Home Total ShotOnGoal":"Away Total ShotOnGoal";
+  return isHome?"Shots. Home Total":"Shots. Away Total";
+}
+function altMarkets(market){
+  if(market==="Home Total ShotOnGoal")return ["Home Shots On Target",market];
+  if(market==="Away Total ShotOnGoal")return ["Away Shots On Target",market];
+  return [market];
+}
+function marketLine(mk,market){
+  if(!mk||!mk.markets)return null;
+  var names=altMarkets(market), m=null;
+  for(var i=0;i<names.length;i++){if(mk.markets[names[i]]){m=mk.markets[names[i]];break;}}
+  if(!m)return null;
+  var line=m.bl!=null?m.bl:(m.rows&&m.rows.length?m.rows[Math.floor(m.rows.length/2)][0]:null);
+  if(line==null)return null;
+  return {line:line, book:m.book||""};
+}
+function bookReco(exp,mk,market){
+  var ml=marketLine(mk,market); if(!ml)return null;
+  return {line:ml.line, side:exp>ml.line?"over":"under", book:ml.book};
 }
 function oddsHTML(o){
   if(!o||!o.markets)return "";
@@ -498,7 +534,7 @@ function runAnalyse(){
 
 // ---- backtest ----
 function buildBacktest(){
-  var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value;
+  var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value, mode=$("btMode").value;
   var unit=metric==="sot"?"tirs cadrés":"tirs";
   var rows=[];
   Object.keys(TEAMS).forEach(function(n){
@@ -508,24 +544,34 @@ function buildBacktest(){
       if(fComp&&fComp!=="all"&&m.comp!==fComp)return;
       if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
       var pm=predictAt(n,m.opp,true,m.date); if(!pm)return;
-      var real=m[metric];
-      var rc=metric==="sot"?pm.recoSot:pm.recoShots;
-      var exp=metric==="sot"?pm.expSot:pm.exp;
+      var real=m[metric], exp=metric==="sot"?pm.expSot:pm.exp, rc, src;
+      if(mode==="book"){
+        var mk=histOdds(m.fid); if(!mk||!mk.markets)return;
+        rc=bookReco(exp,mk,teamMarket(m.home,metric)); if(!rc)return;
+        src="book";
+      }else{
+        rc=metric==="sot"?pm.recoSot:pm.recoShots; src="model";
+      }
       var line=rc.line, over=rc.side==="over";
-      rows.push({date:m.date,name:n,opp:m.opp,match:fr(n)+" - "+fr(m.opp),lbl:(over?"OVER ":"UNDER ")+frn(line)+" "+unit,pred:r1(exp),real:real,thr:line,over:over});
+      rows.push({date:m.date,name:n,opp:m.opp,match:fr(n)+" - "+fr(m.opp),lbl:(over?"OVER ":"UNDER ")+frn(line)+" "+unit+(src==="book"&&rc.book?" ("+rc.book+")":""),pred:r1(exp),real:real,thr:line,over:over,src:src});
     });
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
   rows=rows.slice(0,60);
-  var bet=0,err=0;
+  var bet=0,err=0,bookN=0,bookOk=0;
   document.querySelector("#bt tbody").innerHTML=rows.map(function(r){
     var ao=r.real>r.thr, ok=r.over===ao; if(ok)bet++; err+=Math.abs(r.real-r.pred);
+    if(r.src==="book"){bookN++; if(ok)bookOk++;}
     return '<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+'</td><td>'+r.match+'</td><td><span class="pill '+(r.over?"W":"L")+'">'+r.lbl+'</span></td><td class="num"><b>'+r.pred+'</b></td><td class="num">'+r.real+'</td><td><span class="pill '+(ok?"W":"L")+'">'+(ok?"gagné":"perdu")+'</span></td></tr>';
-  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Pas encore assez de données pour ce filtre.</td></tr>';
+  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">'+(mode==="book"?"Pas encore de cotes historiques pour ce filtre — le collecteur les remplit progressivement.":"Pas encore assez de données pour ce filtre.")+'</td></tr>';
   var n=rows.length||1;
-  $("scoreCards").innerHTML='<div class="card g"><div class="v">'+(rows.length?Math.round(bet/n*100)+"%":"—")+'</div><div class="k">Paris corrects</div></div>'+
+  var cards='<div class="card g"><div class="v">'+(rows.length?Math.round(bet/n*100)+"%":"—")+'</div><div class="k">Paris corrects</div></div>'+
     '<div class="card w"><div class="v">'+(rows.length?(err/n).toFixed(1):"—")+'</div><div class="k">Erreur moyenne ('+unit+')</div></div>'+
     '<div class="card"><div class="v">'+rows.length+'</div><div class="k">Matchs testés</div></div>';
+  if(mode==="book"&&bookN){
+    cards+='<div class="card g"><div class="v">'+Math.round(bookOk/bookN*100)+'%</div><div class="k">Vs ligne book ('+bookN+' m.)</div></div>';
+  }
+  $("scoreCards").innerHTML=cards;
   document.querySelectorAll("#bt tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(tr.dataset.n,tr.dataset.d,tr.dataset.o);});});
 }
 
@@ -582,7 +628,7 @@ window.addEventListener("DOMContentLoaded",function(){
   $("q").addEventListener("input",renderTeamList);
   $("fcomp").addEventListener("change",renderTeamList);
   $("fseason").addEventListener("change",renderTeamList);
-  ["btTeam","btComp","btSeason","btMetric"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
+  ["btTeam","btComp","btSeason","btMetric","btMode"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("oddGo").addEventListener("click",computeOdds);

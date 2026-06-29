@@ -1,0 +1,30 @@
+name: Rafraichissement cotes
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  odds:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Rafraichir les cotes a venir
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+        run: python collecte_auto.py --odds-only
+      - name: Publier
+        run: |
+          git config user.name "collecte-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -m "MAJ cotes horaires" || echo "Rien a committer"
+          git push
