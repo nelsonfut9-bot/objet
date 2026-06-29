@@ -450,6 +450,32 @@ function oddsHTML(o){
   if(!blocks)return "";
   return '<div class="secTitle">Cotes du marche (bookmakers)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Cotes reelles via API-Football, sur ce vrai match.</div>'+blocks+'</div>';
 }
+function estMarche(m,Rh,Ra){
+  if(!Rh||Rh.noData||!Ra||Ra.noData)return null;
+  if(m==="Total Shots")return Rh.exp+Ra.exp;
+  if(m==="Total ShotOnGoal")return Rh.expSot+Ra.expSot;
+  if(m==="Shots. Home Total")return Rh.exp;
+  if(m==="Shots. Away Total")return Ra.exp;
+  if(m==="Home Total ShotOnGoal"||m==="Home Shots On Target")return Rh.expSot;
+  if(m==="Away Total ShotOnGoal"||m==="Away Shots On Target")return Ra.expSot;
+  return null;
+}
+function betAdvice(o,Rh,Ra){
+  if(!o||!o.markets)return "";
+  var lab={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadres (match)","Shots. Home Total":"Tirs "+fr(o.h),"Shots. Away Total":"Tirs "+fr(o.a),"Home Total ShotOnGoal":"Tirs cadres "+fr(o.h),"Away Total ShotOnGoal":"Tirs cadres "+fr(o.a),"Home Shots On Target":"Tirs cadres "+fr(o.h),"Away Shots On Target":"Tirs cadres "+fr(o.a)};
+  var rows="";
+  for(var m in o.markets){var mk=o.markets[m];
+    var est=estMarche(m,Rh,Ra); if(est==null)continue;
+    var line=mk.bl!=null?mk.bl:(mk.rows&&mk.rows.length?mk.rows[Math.floor(mk.rows.length/2)][0]:null);
+    if(line==null)continue;
+    var side=est>line?"OVER":"UNDER", edge=Math.abs(est-line);
+    var conf=edge>2?"forte":(edge>1?"moyenne":"faible");
+    var col=side==="OVER"?"var(--good)":"var(--warn)";
+    rows+='<div class="srow"><span class="lab">'+(lab[m]||m)+'</span><span><b style="color:'+col+'">'+side+' '+frn(line)+'</b> &middot; mon estim. '+r1(est)+' &middot; '+(mk.book||"")+' &middot; confiance '+conf+'</span></div>';
+  }
+  if(!rows)return "";
+  return '<div class="secTitle">Mon conseil de pari (mon estimation vs le marche)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Je compare mon estimation a la ligne du book : au-dessus = OVER, en dessous = UNDER. Plus l ecart est grand, plus la confiance est forte.</div>'+rows+'</div>';
+}
 function teamCard(R,lieu){
   if(!R||R.noData)return '<div class="b"><div class="l">'+lieu+' — '+fr(R&&R.name?R.name:"?")+'</div><div class="small muted" style="margin-top:8px">Pas assez de données pour cette équipe.</div></div>';
   return '<div class="b"><div class="l">'+lieu+' — '+fr(R.name)+'</div>'+
@@ -464,7 +490,7 @@ function runAnalyse(){
   var Rh=predict(h,a,true,ck), Ra=predict(a,h,false,ck);
   var html='<div class="secTitle" style="margin-top:0">'+fr(h)+' (domicile) vs '+fr(a)+' (extérieur) — '+(C[ck]?C[ck].l:"")+'</div>'+
     '<div class="est">'+teamCard(Rh,"Domicile")+teamCard(Ra,"Extérieur")+'</div>'+
-    oddsHTML(findOdds(h,a));
+    betAdvice(findOdds(h,a),Rh,Ra)+oddsHTML(findOdds(h,a));
   if(Rh&&!Rh.noData){html+='<div class="secTitle">Mes cotes équitables — tirs '+fr(h)+'</div>'+fairTable(Rh.exp,Rh.sd);}
   if(Ra&&!Ra.noData){html+='<div class="secTitle">Mes cotes équitables — tirs '+fr(a)+'</div>'+fairTable(Ra.exp,Ra.sd);}
   $("result").innerHTML=html;
