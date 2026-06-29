@@ -155,7 +155,7 @@
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
       <p class="small muted">Backtest 100% honnête : pour chaque match, l'estimation n'utilise QUE les matchs joués AVANT cette date — jamais le match lui-même, jamais les matchs postérieurs. Comme si je n'avais pas vu le résultat. Cliquez une ligne pour voir le détail et la prédiction d'avant-match.</p>
       <div class="filterbar">
-        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option></select></div>
+        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="cor">Corners</option><option value="xg">Buts attendus (xG)</option></select></div>
         <div class="field"><label>Portée</label><select id="btScope"><option value="all">Tout (équipes + match)</option><option value="teams">Par équipe (A &amp; B)</option><option value="match">Match (total) seulement</option></select></div>
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
@@ -179,6 +179,7 @@
       <p class="small muted">Pour chaque match dont on a capté les <b>vraies cotes bookmaker</b>, je place une mise fixe de <b>200 €</b> sur le côté (OVER/UNDER) recommandé par mon modèle d'avant-match (zéro lookahead), puis je règle le pari avec le résultat réel. Seules les vraies cotes sont utilisées : la bankroll se remplit au fur et à mesure que les matchs à venir (cotes déjà captées) sont joués.</p>
       <div class="filterbar">
         <div class="field"><label>Mise</label><select id="bkStake"><option value="flat">Fixe 200 €</option><option value="kelly">Kelly (½, base 1000 €)</option></select></div>
+        <div class="field"><label>Type de pari</label><select id="bkType"><option value="all">Tous</option><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="cor">Corners</option><option value="goals">Buts</option></select></div>
         <div class="field"><label>Marché</label><select id="bkScope"><option value="all">Tous</option><option value="totals">Totaux match</option><option value="teams">Par équipe</option></select></div>
         <div class="field"><label>Statut</label><select id="bkStatus"><option value="all">Tous</option><option value="settled">Réglés</option><option value="pending">En attente</option></select></div>
         <div class="field" style="max-width:160px"><label>Du</label><input type="date" id="bkFrom"></div>
@@ -495,10 +496,21 @@ function predict(name,opp,isHome,compKey){
   var sotRatio=mean(sf)?mean(sot)/mean(sf):0.35;
   var expSot=exp*sotRatio*(0.96+0.08*defF);
   var sdSot=Math.max(std(sot)*0.9,1.0);
+  // calibration : on remplace l'incertitude brute par l'erreur réelle mesurée du modèle (+ correction de biais)
+  exp=Math.max(0,exp+(CAL.ts_bias||0)); sd=CAL.ts||sd;
+  expSot=Math.max(0,expSot+(CAL.sot_bias||0)); sdSot=CAL.sot||sdSot;
   var rc=reco(exp,sd), rcs=reco(expSot,sdSot);
+  // corners & xG (même logique de forme, calibrés)
+  var corV=ms.map(function(m){return m.cor;}).filter(function(x){return x!=null;});
+  var xgV=ms.map(function(m){return m.xg;}).filter(function(x){return x!=null;});
+  var corExp=null,recoCor=null;
+  if(corV.length>=3){var cb=0.6*mean(corV.slice(0,5))+0.4*mean(corV.slice(0,10));corExp=Math.max(0,cb*(isHome?1.08:0.94)+(CAL.cor_bias||0));recoCor=reco(corExp,CAL.cor||3.3);}
+  var xgExp=null,recoXg=null;
+  if(xgV.length>=3){var xb=0.6*mean(xgV.slice(0,5))+0.4*mean(xgV.slice(0,10));xgExp=Math.max(0,xb*(isHome?1.08:0.94)+(CAL.xg_bias||0));recoXg=reco(xgExp,CAL.xg||0.9);}
   function pO(thr,mu,s){return Math.round((1-normCdf(thr,mu,s))*100);}
   return {name:name,opp:opp,isHome:isHome,exp:r1(exp),expSot:r1(expSot),sd:r1(sd),sdSot:r1(sdSot),
-    form5:r1(form5),form10:r1(form10),oppCd:r1(oc),defF:defF,xg:xgf.length?r2(mean(xgf)):null,
+    corExp:corExp==null?null:r1(corExp),recoCor:recoCor,xgExp:xgExp==null?null:r2(xgExp),recoXg:recoXg,
+    form5:r1(form5),form10:r1(form10),oppCd:r1(oc),defF:defF,xg:xgV.length?r2(mean(xgV)):null,
     intv:[Math.max(0,Math.round(exp-0.85*sd)),Math.max(0,Math.round(exp+0.85*sd))],intvS:[Math.max(0,Math.round(expSot-0.85*sdSot)),Math.max(0,Math.round(expSot+0.85*sdSot))],
     recoShots:rc,recoSot:rcs,
     probs:[[13.5,pO(13.5,exp,sd)],[15.5,pO(15.5,exp,sd)],[17.5,pO(17.5,exp,sd)]],
@@ -555,7 +567,16 @@ function teamCard(R,lieu){
   return '<div class="b"><div class="l">'+lieu+' — '+fr(R.name)+'</div>'+
     '<div style="margin-top:8px;font-size:14px">Tirs : <span class="big" style="font-size:26px">'+R.exp+'</span> <span class="muted small">('+R.intv[0]+'–'+R.intv[1]+')</span></div>'+
     '<div style="font-size:14px;margin-top:2px">Tirs cadrés : <span class="big" style="font-size:26px;color:var(--accent2)">'+R.expSot+'</span> <span class="muted small">('+R.intvS[0]+'–'+R.intvS[1]+')</span></div>'+
-    recoHTML(R.recoShots,"Tirs "+fr(R.name))+recoHTML(R.recoSot,"Cadrés "+fr(R.name))+'</div>';
+    recoHTML(R.recoShots,"Tirs "+fr(R.name))+recoHTML(R.recoSot,"Cadrés "+fr(R.name))+
+    (R.corExp!=null?'<div style="font-size:14px;margin-top:6px">Corners : <span class="big" style="font-size:22px;color:var(--warn)">'+R.corExp+'</span></div>'+recoHTML(R.recoCor,"Corners "+fr(R.name)):'')+
+    (R.xgExp!=null?'<div style="font-size:14px;margin-top:4px">Buts attendus (xG) : <span class="big" style="font-size:22px;color:var(--xg)">'+frn(R.xgExp)+'</span></div>'+recoHTML(R.recoXg,"xG "+fr(R.name)):'')+'</div>';
+}
+function matchTotalsHTML(Rh,Ra){
+  if(!Rh||Rh.noData||!Ra||Ra.noData)return '';
+  function L(lbl,h,a,dec){if(h==null||a==null)return '';var t=h+a;return '<div class="srow"><span class="lab">'+lbl+'</span><span><b>'+(dec?frn(r1(t)):Math.round(t))+'</b></span></div>';}
+  return '<div class="secTitle">Totaux match (mon estimation)</div><div class="prebox">'+
+    L("Total tirs",Rh.exp,Ra.exp)+L("Total tirs cadrés",Rh.expSot,Ra.expSot)+
+    L("Total corners",Rh.corExp,Ra.corExp)+L("Total buts attendus (xG)",Rh.xgExp,Ra.xgExp,1)+'</div>';
 }
 function runAnalyse(){
   try{
@@ -567,7 +588,7 @@ function runAnalyse(){
     var od=findOdds(h,a);
     $("result").innerHTML='<div class="secTitle" style="margin-top:0">'+fr(h)+' (domicile) vs '+fr(a)+' (extérieur) — '+(C[ck]?C[ck].l:"")+'</div>'+
       '<div class="est">'+teamCard(Rh,"Domicile")+teamCard(Ra,"Extérieur")+'</div>'+
-      betAdvice(od,Rh,Ra)+oddsHTML(od);
+      matchTotalsHTML(Rh,Ra)+betAdvice(od,Rh,Ra)+oddsHTML(od);
     try{$("result").scrollIntoView({behavior:"smooth",block:"start"});}catch(e2){}
   }catch(e){
     $("result").classList.remove("hidden");
@@ -580,7 +601,8 @@ function runAnalyse(){
 function realSide(m,metric,side){
   if(side==="home")return m[metric];
   if(m.o&&m.o[metric]!=null)return m.o[metric];
-  return metric==="sot"?m.a_sot:m.a_ts;
+  if(metric==="sot")return m.a_sot; if(metric==="ts")return m.a_ts; if(metric==="xg")return m.a_xg;
+  return null;
 }
 // conseil OVER/UNDER pour le total du match (somme des deux équipes)
 function recoTotal(eH,sdH,eA,sdA){var mu=eH+eA,sd=Math.sqrt(sdH*sdH+sdA*sdA);return {mu:mu,sd:sd,rc:reco(mu,sd)};}
@@ -595,7 +617,8 @@ function btCell(rc,real){
 function buildBacktest(){
   var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value, scope=$("btScope").value;
   var fFrom=$("btFrom").value, fTo=$("btTo").value;
-  var unit=metric==="sot"?"tirs cadrés":"tirs";
+  var UNIT={ts:"tirs",sot:"tirs cadrés",cor:"corners",xg:"buts attendus (xG)"};
+  var unit=UNIT[metric]||"tirs";
   var showA=scope!=="match", showB=scope!=="match", showM=scope!=="teams";
   var rows=[];
   Object.keys(TEAMS).forEach(function(n){
@@ -606,16 +629,13 @@ function buildBacktest(){
       if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
       if(fFrom&&m.date<fFrom)return;
       if(fTo&&m.date>fTo)return;
-      var pmH=predictAt(n,m.opp,true,m.date); if(!pmH)return;
-      var pmA=predictAt(m.opp,n,false,m.date);
-      var rcH=metric==="sot"?pmH.recoSot:pmH.recoShots;
-      var eH=metric==="sot"?pmH.expSot:pmH.exp, sdH=metric==="sot"?pmH.sdSot:pmH.sd;
-      var realH=realSide(m,metric,"home");
+      var ph=metricPred(metric,n,m.opp,true,m.date); if(!ph)return;
+      var pa=metricPred(metric,m.opp,n,false,m.date);
+      var rcH=ph.rc, realH=realSide(m,metric,"home");
       var rcA=null,realA=null,rcM=null,realM=null;
-      if(pmA){
-        var eA=metric==="sot"?pmA.expSot:pmA.exp, sdA=metric==="sot"?pmA.sdSot:pmA.sd;
-        rcA=metric==="sot"?pmA.recoSot:pmA.recoShots; realA=realSide(m,metric,"away");
-        rcM=recoTotal(eH,sdH,eA,sdA).rc;
+      if(pa){
+        rcA=pa.rc; realA=realSide(m,metric,"away");
+        rcM=recoTotal(ph.exp,ph.sd,pa.exp,pa.sd).rc;
         realM=(realH!=null&&realA!=null)?(realH+realA):null;
       }
       rows.push({date:m.date,dt:m.dt,name:n,opp:m.opp,rcH:rcH,realH:realH,rcA:rcA,realA:realA,rcM:rcM,realM:realM});
@@ -623,7 +643,8 @@ function buildBacktest(){
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
   rows=rows.slice(0,80);
-  var lblMetric=metric==="sot"?"cadrés":"tirs";
+  var LBLM={ts:"tirs",sot:"cadrés",cor:"corners",xg:"xG"};
+  var lblMetric=LBLM[metric]||"tirs";
   var th='<tr><th>Date</th><th>Match (A – B)</th>';
   if(showA)th+='<th>Équipe A ('+lblMetric+')</th>';
   if(showB)th+='<th>Équipe B ('+lblMetric+')</th>';
@@ -703,16 +724,50 @@ function predKeyAt(name,opp,isHome,date,key,oppKey,lg,homeB,minSd){
   return {exp:base*(0.6+0.4*defF)*(isHome?homeB:(2-homeB)),sd:Math.max(std(vals),minSd),n:past.length};
 }
 function _comb(h,a){return (h&&a)?{exp:h.exp+a.exp,sd:Math.sqrt(h.sd*h.sd+a.sd*a.sd)}:null;}
+// ---- calibration pilotée par les données : l'incertitude = erreur réelle passée du modèle ----
+var CAL={ts:3.6,sot:1.9,cor:3.3,xg:0.9,ts_bias:0,sot_bias:0,cor_bias:0,xg_bias:0,done:false};
+function _rawKeyExp(name,opp,isHome,date,metric){
+  if(metric==="ts"){var p=predictAt(name,opp,isHome,date);return p?p.exp:null;}
+  if(metric==="sot"){var p2=predictAt(name,opp,isHome,date);return p2?p2.expSot:null;}
+  if(metric==="cor"){var k=predKeyAt(name,opp,isHome,date,"cor",null,null,1.08,1.4);return k?k.exp:null;}
+  if(metric==="xg"){var x=predKeyAt(name,opp,isHome,date,"xg","a_xg",1.4,1.08,0.5);return x?x.exp:null;}
+  return null;
+}
+function calibrateModel(){
+  var res={ts:[],sot:[],cor:[],xg:[]};
+  Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){
+    if(!m.home)return;
+    ["ts","sot","cor","xg"].forEach(function(k){
+      if(m[k]==null)return;
+      var e=_rawKeyExp(n,m.opp,true,m.date,k);
+      if(e!=null)res[k].push(m[k]-e);
+    });
+  });});
+  ["ts","sot","cor","xg"].forEach(function(k){
+    var a=res[k]; if(a.length<30)return;
+    var mu=mean(a), sd=Math.sqrt(mean(a.map(function(x){return (x-mu)*(x-mu);})));
+    CAL[k]=Math.max(sd, k==="xg"?0.5:1.0);
+    // biais volontairement laissé à 0 : il sur-corrige. Le mean est plutôt ancré au marché (cf. valueBets/bankrollBets).
+  });
+  CAL.done=true;
+}
+// prédiction calibrée par stat (par équipe) : {exp,sd,rc}
+function metricPred(metric,name,opp,isHome,date){
+  var e=_rawKeyExp(name,opp,isHome,date,metric); if(e==null)return null;
+  e=Math.max(0,e+(CAL[metric+"_bias"]||0));
+  var s=CAL[metric]||(metric==="xg"?0.9:2);
+  return {exp:e,sd:s,rc:reco(e,s)};
+}
 // estimation pré-match {exp,sd} pour n'importe quel marché collecté
 function marketPre(n,home,away,date){
-  if(n==="Total Shots"){var h=predictAt(home,away,true,date),a=predictAt(away,home,false,date);return (h&&a)?{exp:h.exp+a.exp,sd:Math.sqrt(h.sd*h.sd+a.sd*a.sd)}:null;}
-  if(n==="Total ShotOnGoal"){var h2=predictAt(home,away,true,date),a2=predictAt(away,home,false,date);return (h2&&a2)?{exp:h2.expSot+a2.expSot,sd:Math.sqrt(h2.sdSot*h2.sdSot+a2.sdSot*a2.sdSot)}:null;}
-  if(n==="Shots. Home Total"){var h3=predictAt(home,away,true,date);return h3?{exp:h3.exp,sd:h3.sd}:null;}
-  if(n==="Shots. Away Total"){var a3=predictAt(away,home,false,date);return a3?{exp:a3.exp,sd:a3.sd}:null;}
-  if(n==="Home Total ShotOnGoal"||n==="Home Shots On Target"){var h4=predictAt(home,away,true,date);return h4?{exp:h4.expSot,sd:h4.sdSot}:null;}
-  if(n==="Away Total ShotOnGoal"||n==="Away Shots On Target"){var a4=predictAt(away,home,false,date);return a4?{exp:a4.expSot,sd:a4.sdSot}:null;}
+  if(n==="Total Shots")return _comb(metricPred("ts",home,away,true,date),metricPred("ts",away,home,false,date));
+  if(n==="Total ShotOnGoal")return _comb(metricPred("sot",home,away,true,date),metricPred("sot",away,home,false,date));
+  if(n==="Shots. Home Total")return metricPred("ts",home,away,true,date);
+  if(n==="Shots. Away Total")return metricPred("ts",away,home,false,date);
+  if(n==="Home Total ShotOnGoal"||n==="Home Shots On Target")return metricPred("sot",home,away,true,date);
+  if(n==="Away Total ShotOnGoal"||n==="Away Shots On Target")return metricPred("sot",away,home,false,date);
   if(n==="Goals Over/Under")return _comb(predKeyAt(home,away,true,date,"gf","ga",1.4,1.12,0.95),predKeyAt(away,home,false,date,"gf","ga",1.4,1.12,0.95));
-  if(/corner/i.test(n))return _comb(predKeyAt(home,away,true,date,"cor",null,null,1.08,1.4),predKeyAt(away,home,false,date,"cor",null,null,1.08,1.4));
+  if(/corner/i.test(n))return _comb(metricPred("cor",home,away,true,date),metricPred("cor",away,home,false,date));
   if(/card/i.test(n))return _comb(predKeyAt(home,away,true,date,"yc",null,null,0.98,1.2),predKeyAt(away,home,false,date,"yc",null,null,0.98,1.2));
   return null;
 }
@@ -741,7 +796,9 @@ function bankrollBets(){
     for(var mkName in o.markets){
       var mk=o.markets[mkName];var row=oddsRowFor(mk);if(!row)continue;
       var pe=marketPre(mkName,h,a,date);if(!pe)continue;
-      var pOver=1-normCdf(row.line,pe.exp,pe.sd);
+      var anchor=(mk.bl!=null)?mk.bl:row.line;
+      var estA=0.5*pe.exp+0.5*anchor;
+      var pOver=1-normCdf(row.line,estA,pe.sd);
       var side=pOver>=0.5?"OVER":"UNDER", prob=side==="OVER"?pOver:1-pOver;
       var odd=side==="OVER"?row.over:row.under;
       if(!odd||odd<1.01)continue;
@@ -750,7 +807,7 @@ function bankrollBets(){
       var placed=openOdd||odd;
       var clv=(openOdd&&odd&&openOdd!==odd)?r1((placed/odd-1)*100):(openOdd?0:null);
       var bet={date:date,dt:(played&&played.dt)||null,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
-        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:placed,oddClose:odd,clv:clv,prob:prob,est:r1(pe.exp),status:"pending"};
+        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:placed,oddClose:odd,clv:clv,prob:prob,est:r1(estA),status:"pending"};
       if(played){
         var real=realMarket(mkName,played);
         if(real!=null){bet.real=real;
@@ -793,8 +850,17 @@ function segmentsHTML(settled){
   function mtype(b){if(MK_TOTALS[b.market])return "Totaux tirs";if(/ShotOnGoal|Shots on|Shots\./i.test(b.market))return "Tirs (équipe)";if(b.market==="Goals Over/Under")return "Buts";if(/corner/i.test(b.market))return "Corners";if(/card/i.test(b.market))return "Cartons";return b.market;}
   return grp(mtype,"Par marché")+grp(function(b){return b.comp;},"Par compétition")+grp(function(b){return b.book;},"Par bookmaker");
 }
+function marketStat(mk){
+  if(/ShotOnGoal|Shots on/i.test(mk))return "sot";
+  if(/Shot/i.test(mk))return "ts";
+  if(/corner/i.test(mk))return "cor";
+  if(/card/i.test(mk))return "card";
+  if(/goal|but/i.test(mk))return "goals";
+  return "?";
+}
 function buildBankroll(){
   var mScope=$("bkScope").value, status=$("bkStatus").value, fFrom=$("bkFrom").value, fTo=$("bkTo").value;
+  var bType=$("bkType")?$("bkType").value:"all";
   var mode=$("bkStake")?$("bkStake").value:"flat", KCAP=1000;
   function stakeOf(b){
     if(mode==="kelly"){var bb=b.odd-1;if(bb<=0)return 0;var f=(bb*b.prob-(1-b.prob))/bb;f=Math.max(0,f)*0.5;f=Math.min(f,0.1);return Math.round(f*KCAP);}
@@ -803,6 +869,7 @@ function buildBankroll(){
   var bets=bankrollBets().filter(function(b){
     if(mScope==="totals"&&!MK_TOTALS[b.market])return false;
     if(mScope==="teams"&&MK_TOTALS[b.market])return false;
+    if(bType!=="all"&&marketStat(b.market)!==bType)return false;
     if(fFrom&&b.date<fFrom)return false;
     if(fTo&&b.date>fTo)return false;
     return true;
@@ -854,7 +921,9 @@ function valueBets(){
     for(var mk in o.markets){
       var m=o.markets[mk],row=oddsRowFor(m);if(!row)continue;
       var pe=marketPre(mk,o.h,o.a,o.date);if(!pe)continue;
-      var pOver=1-normCdf(row.line,pe.exp,pe.sd);
+      var anchor=(m.bl!=null)?m.bl:row.line;
+      var estA=0.5*pe.exp+0.5*anchor;
+      var pOver=1-normCdf(row.line,estA,pe.sd);
       var side=pOver>=0.5?"OVER":"UNDER", myP=side==="OVER"?pOver:1-pOver;
       var odd=side==="OVER"?row.over:row.under;if(!odd||odd<1.01)continue;
       var imp=side==="OVER"?(1/row.over)/((1/row.over)+(1/row.under)):(1/row.under)/((1/row.over)+(1/row.under));
@@ -876,7 +945,7 @@ function buildValueBets(){
 function buildCalibration(){
   var buckets={};
   function add(rc,real){if(!rc||real==null)return;var p=rc.prob/100,hit=((real>rc.line)===(rc.side==="over"))?1:0,bk=Math.min(9,Math.floor(p*10));buckets[bk]=buckets[bk]||{n:0,h:0,ps:0};buckets[bk].n++;buckets[bk].h+=hit;buckets[bk].ps+=p;}
-  Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){if(!m.home)return;var pm=predictAt(n,m.opp,true,m.date);if(!pm)return;add(pm.recoShots,m.ts);add(pm.recoSot,m.sot);});});
+  Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){if(!m.home)return;var ph=metricPred("ts",n,m.opp,true,m.date),ps=metricPred("sot",n,m.opp,true,m.date);if(ph)add(ph.rc,m.ts);if(ps)add(ps.rc,m.sot);});});
   var rows='';
   for(var i=9;i>=5;i--){var b=buckets[i];if(!b)continue;var pred=Math.round(b.ps/b.n*100),act=Math.round(b.h/b.n*100);rows+='<tr><td>'+(i*10)+'–'+(i*10+10)+'%</td><td class="num">'+b.n+'</td><td class="num">'+pred+'%</td><td class="num">'+act+'%</td><td class="num" style="color:'+(Math.abs(pred-act)<=8?'var(--good)':'var(--warn)')+'">'+(act-pred>=0?'+':'')+(act-pred)+'</td></tr>';}
   $("calBody").innerHTML=rows||'<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">Pas encore assez de données.</td></tr>';
@@ -911,6 +980,7 @@ window.addEventListener("DOMContentLoaded",function(){
   });});
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
+  calibrateModel();
   fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
   if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
   $("q").addEventListener("input",renderTeamList);
@@ -919,7 +989,7 @@ window.addEventListener("DOMContentLoaded",function(){
   $("fseason").addEventListener("change",renderTeamList);
   ["btTeam","btComp","btSeason","btMetric","btScope","btFrom","btTo"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   $("btReset").addEventListener("click",function(){$("btFrom").value="";$("btTo").value="";buildBacktest();});
-  ["bkScope","bkStatus","bkFrom","bkTo","bkStake"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
+  ["bkScope","bkStatus","bkFrom","bkTo","bkStake","bkType"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
   $("bkReset").addEventListener("click",function(){$("bkFrom").value="";$("bkTo").value="";buildBankroll();});
   $("bkExport").addEventListener("click",exportBankrollCSV);
   $("vbScope").addEventListener("change",buildValueBets);
