@@ -99,6 +99,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="equipes">Équipes</div>
     <div class="tab" data-tab="avenir">Matchs à venir</div>
+    <div class="tab" data-tab="value">Value bets</div>
     <div class="tab" data-tab="analyse">Analyse d'un match</div>
     <div class="tab" data-tab="suivi">Suivi & fiabilité</div>
     <div class="tab" data-tab="bankroll">Bankroll</div>
@@ -122,6 +123,18 @@
       <div class="secTitle" style="margin-top:0">Prochains matchs</div>
       <p class="small muted">Cliquez un match pour l'analyser. La liste se remplit au fil de la collecte automatique.</p>
       <table id="up"><thead><tr><th>Date</th><th>Match</th><th>Compétition</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section id="value" class="hidden">
+    <div class="panel">
+      <div class="secTitle" style="margin-top:0">Value bets — matchs à venir</div>
+      <p class="small muted">Pour chaque match à venir dont on a les vraies cotes, je compare ma probabilité à celle du marché. <b>Edge</b> = ma proba − proba du marché. <b>EV</b> = espérance par euro misé (positif = pari à valeur). Trié par EV décroissant.</p>
+      <div class="filterbar">
+        <div class="field" style="max-width:240px"><label>Affichage</label><select id="vbScope"><option value="value">Valeur positive (EV &gt; 0)</option><option value="all">Tous</option></select></div>
+        <div class="field" style="display:flex;align-items:flex-end"><span class="small muted" id="vbCount"></span></div>
+      </div>
+      <table id="vb"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Book</th><th class="num">Cote</th><th class="num">Ma proba</th><th class="num">Marché</th><th class="num">Edge</th><th class="num">EV</th></tr></thead><tbody id="vbBody"></tbody></table>
     </div>
   </section>
 
@@ -154,6 +167,9 @@
       <p class="small muted" style="margin:0 0 8px">Équipe A = domicile, Équipe B = extérieur, Match = total des deux équipes. Chaque pari est jugé gagné/perdu séparément. Choisis une plage de dates (Du / Au) pour voir les % évoluer sur la période.</p>
       <div class="cards" id="scoreCards"></div>
       <table id="bt"><thead></thead><tbody></tbody></table>
+      <div style="margin-top:18px"><div class="secTitle">Calibration du modèle (tirs & cadrés)</div>
+      <p class="small muted">Quand le modèle annonce une confiance, est-elle vérifiée dans les faits ? « Prévu » ≈ « Réel » = modèle bien calibré.</p>
+      <table id="cal"><thead><tr><th>Confiance annoncée</th><th class="num">Paris</th><th class="num">Prévu</th><th class="num">Réel</th><th class="num">Écart</th></tr></thead><tbody id="calBody"></tbody></table></div>
     </div>
   </section>
 
@@ -162,6 +178,7 @@
       <div class="secTitle" style="margin-top:0">Bankroll simulée — 200 € par pari, vraies cotes</div>
       <p class="small muted">Pour chaque match dont on a capté les <b>vraies cotes bookmaker</b>, je place une mise fixe de <b>200 €</b> sur le côté (OVER/UNDER) recommandé par mon modèle d'avant-match (zéro lookahead), puis je règle le pari avec le résultat réel. Seules les vraies cotes sont utilisées : la bankroll se remplit au fur et à mesure que les matchs à venir (cotes déjà captées) sont joués.</p>
       <div class="filterbar">
+        <div class="field"><label>Mise</label><select id="bkStake"><option value="flat">Fixe 200 €</option><option value="kelly">Kelly (½, base 1000 €)</option></select></div>
         <div class="field"><label>Marché</label><select id="bkScope"><option value="all">Tous</option><option value="totals">Totaux match</option><option value="teams">Par équipe</option></select></div>
         <div class="field"><label>Statut</label><select id="bkStatus"><option value="all">Tous</option><option value="settled">Réglés</option><option value="pending">En attente</option></select></div>
         <div class="field" style="max-width:160px"><label>Du</label><input type="date" id="bkFrom"></div>
@@ -170,7 +187,9 @@
         <div class="field" style="display:flex;align-items:flex-end"><button class="tab" id="bkExport" style="background:var(--accent2);color:#04223f;border-color:var(--accent2);width:100%">⬇ Exporter en CSV</button></div>
       </div>
       <div class="cards" id="bkCards"></div>
-      <table id="bk"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Bookmaker</th><th class="num">Cote</th><th class="num">Mise</th><th>Résultat</th><th class="num">Gain</th><th class="num">Bénéfice</th></tr></thead><tbody id="bkBody"></tbody></table>
+      <div id="bkCurve"></div>
+      <table id="bk"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Bookmaker</th><th class="num">Cote</th><th class="num">Mise</th><th>Résultat</th><th class="num">Gain</th><th class="num">Bénéfice</th><th class="num">CLV</th></tr></thead><tbody id="bkBody"></tbody></table>
+      <div id="bkSegments" style="margin-top:18px"></div>
     </div>
   </section>
   <footer style="color:var(--muted);font-size:11px;text-align:center;margin-top:18px">Données API-Football · mise à jour automatique quotidienne</footer>
@@ -665,21 +684,36 @@ function buildUpcoming(){
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
 function loadMatch(h,a){if(TEAMS[h])$("home").value=h;if(TEAMS[a])$("away").value=a;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","analyse","suivi","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","value","analyse","suivi","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
 
 // ---- bankroll (mise fixe, vraies cotes uniquement) ----
 var STAKE=200;
-var MK_LABEL={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadrés (match)","Shots. Home Total":"Tirs domicile","Shots. Away Total":"Tirs extérieur","Home Total ShotOnGoal":"Tirs cadrés domicile","Away Total ShotOnGoal":"Tirs cadrés extérieur","Home Shots On Target":"Tirs cadrés domicile","Away Shots On Target":"Tirs cadrés extérieur"};
+var MK_LABEL={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadrés (match)","Shots. Home Total":"Tirs domicile","Shots. Away Total":"Tirs extérieur","Home Total ShotOnGoal":"Tirs cadrés domicile","Away Total ShotOnGoal":"Tirs cadrés extérieur","Home Shots On Target":"Tirs cadrés domicile","Away Shots On Target":"Tirs cadrés extérieur","Goals Over/Under":"Total buts (match)","Corners Over Under":"Total corners (match)","Total Corners":"Total corners (match)","Total - Corners":"Total corners (match)","Cards Over/Under":"Total cartons (match)","Total Cards":"Total cartons (match)","Total - Cards":"Total cartons (match)"};
 var MK_TOTALS={"Total Shots":1,"Total ShotOnGoal":1};
 function oddsRowFor(mk){var rows=mk.rows||[];if(!rows.length)return null;var best=rows[Math.floor(rows.length/2)];if(mk.bl!=null){var bd=1e9;rows.forEach(function(r){var d=Math.abs(r[0]-mk.bl);if(d<bd){bd=d;best=r;}});}return {line:best[0],over:best[1],under:best[2]};}
-function preEstMarket(mkName,pH,pA){
-  if(!pH)return null;
-  if(mkName==="Total Shots")return pA?pH.exp+pA.exp:null;
-  if(mkName==="Total ShotOnGoal")return pA?pH.expSot+pA.expSot:null;
-  if(mkName==="Shots. Home Total")return pH.exp;
-  if(mkName==="Shots. Away Total")return pA?pA.exp:null;
-  if(mkName==="Home Total ShotOnGoal"||mkName==="Home Shots On Target")return pH.expSot;
-  if(mkName==="Away Total ShotOnGoal"||mkName==="Away Shots On Target")return pA?pA.expSot:null;
+function oddsRowAt(mk,line){var rows=mk.rows||[];for(var i=0;i<rows.length;i++){if(rows[i][0]===line)return {line:rows[i][0],over:rows[i][1],under:rows[i][2]};}return null;}
+// prédiction pré-match générique d'une stat (zéro lookahead) : buts, corners, cartons…
+function predKeyAt(name,opp,isHome,date,key,oppKey,lg,homeB,minSd){
+  var t=TEAMS[name]; if(!t)return null;
+  var past=t.matches.filter(function(m){return m.date<date&&m[key]!=null;});
+  if(past.length<3)return null;
+  var vals=past.map(function(m){return m[key];});
+  var base=0.6*mean(vals.slice(0,5))+0.4*mean(vals.slice(0,10)), defF=1;
+  if(oppKey&&lg&&TEAMS[opp]){var op=TEAMS[opp].matches.filter(function(m){return m.date<date&&m[oppKey]!=null;});if(op.length){defF=mean(op.map(function(m){return m[oppKey];}))/lg;}}
+  return {exp:base*(0.6+0.4*defF)*(isHome?homeB:(2-homeB)),sd:Math.max(std(vals),minSd),n:past.length};
+}
+function _comb(h,a){return (h&&a)?{exp:h.exp+a.exp,sd:Math.sqrt(h.sd*h.sd+a.sd*a.sd)}:null;}
+// estimation pré-match {exp,sd} pour n'importe quel marché collecté
+function marketPre(n,home,away,date){
+  if(n==="Total Shots"){var h=predictAt(home,away,true,date),a=predictAt(away,home,false,date);return (h&&a)?{exp:h.exp+a.exp,sd:Math.sqrt(h.sd*h.sd+a.sd*a.sd)}:null;}
+  if(n==="Total ShotOnGoal"){var h2=predictAt(home,away,true,date),a2=predictAt(away,home,false,date);return (h2&&a2)?{exp:h2.expSot+a2.expSot,sd:Math.sqrt(h2.sdSot*h2.sdSot+a2.sdSot*a2.sdSot)}:null;}
+  if(n==="Shots. Home Total"){var h3=predictAt(home,away,true,date);return h3?{exp:h3.exp,sd:h3.sd}:null;}
+  if(n==="Shots. Away Total"){var a3=predictAt(away,home,false,date);return a3?{exp:a3.exp,sd:a3.sd}:null;}
+  if(n==="Home Total ShotOnGoal"||n==="Home Shots On Target"){var h4=predictAt(home,away,true,date);return h4?{exp:h4.expSot,sd:h4.sdSot}:null;}
+  if(n==="Away Total ShotOnGoal"||n==="Away Shots On Target"){var a4=predictAt(away,home,false,date);return a4?{exp:a4.expSot,sd:a4.sdSot}:null;}
+  if(n==="Goals Over/Under")return _comb(predKeyAt(home,away,true,date,"gf","ga",1.4,1.12,0.95),predKeyAt(away,home,false,date,"gf","ga",1.4,1.12,0.95));
+  if(/corner/i.test(n))return _comb(predKeyAt(home,away,true,date,"cor",null,null,1.08,1.4),predKeyAt(away,home,false,date,"cor",null,null,1.08,1.4));
+  if(/card/i.test(n))return _comb(predKeyAt(home,away,true,date,"yc",null,null,0.98,1.2),predKeyAt(away,home,false,date,"yc",null,null,0.98,1.2));
   return null;
 }
 function realMarket(mkName,m){
@@ -690,6 +724,9 @@ function realMarket(mkName,m){
   if(mkName==="Shots. Away Total")return aTs;
   if(mkName==="Home Total ShotOnGoal"||mkName==="Home Shots On Target")return m.sot;
   if(mkName==="Away Total ShotOnGoal"||mkName==="Away Shots On Target")return aSot;
+  if(mkName==="Goals Over/Under")return (m.gf||0)+(m.ga||0);
+  if(/corner/i.test(mkName))return (m.cor||0)+((m.o&&m.o.cor!=null)?m.o.cor:0);
+  if(/card/i.test(mkName))return (m.yc||0)+((m.o&&m.o.yc!=null)?m.o.yc:0);
   return null;
 }
 function findPlayed(h,a,date){var t=TEAMS[h];if(!t)return null;for(var i=0;i<t.matches.length;i++){var m=t.matches[i];if(m.home&&m.date===date&&m.opp===a)return m;}return null;}
@@ -699,22 +736,26 @@ function bankrollBets(){
   Object.keys(ODDS).forEach(function(fid){
     var o=ODDS[fid];if(!o||!o.markets)return;
     var h=o.h,a=o.a,date=o.date;
-    var pH=predictAt(h,a,true,date), pA=predictAt(a,h,false,date);
     var played=findPlayed(h,a,date);
     var compName=(played&&played.comp)||"";
     for(var mkName in o.markets){
       var mk=o.markets[mkName];var row=oddsRowFor(mk);if(!row)continue;
-      var est=preEstMarket(mkName,pH,pA);if(est==null)continue;
-      var side=est>row.line?"OVER":"UNDER";var odd=side==="OVER"?row.over:row.under;
+      var pe=marketPre(mkName,h,a,date);if(!pe)continue;
+      var pOver=1-normCdf(row.line,pe.exp,pe.sd);
+      var side=pOver>=0.5?"OVER":"UNDER", prob=side==="OVER"?pOver:1-pOver;
+      var odd=side==="OVER"?row.over:row.under;
       if(!odd||odd<1.01)continue;
+      var openOdd=null;
+      if(o.open&&o.open[mkName]){var orow=oddsRowAt(o.open[mkName],row.line);if(orow)openOdd=side==="OVER"?orow.over:orow.under;}
+      var placed=openOdd||odd;
+      var clv=(openOdd&&odd&&openOdd!==odd)?r1((placed/odd-1)*100):(openOdd?0:null);
       var bet={date:date,dt:(played&&played.dt)||null,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
-        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:odd,est:r1(est),stake:STAKE,status:"pending"};
+        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:placed,oddClose:odd,clv:clv,prob:prob,est:r1(pe.exp),status:"pending"};
       if(played){
         var real=realMarket(mkName,played);
-        if(real!=null){
-          bet.real=real;
-          if(real===row.line){bet.status="push";bet.gain=STAKE;bet.profit=0;}
-          else{var win=(side==="OVER")?(real>row.line):(real<row.line);bet.status=win?"won":"lost";bet.gain=win?r2(STAKE*odd):0;bet.profit=r2(bet.gain-STAKE);}
+        if(real!=null){bet.real=real;
+          if(real===row.line)bet.status="push";
+          else bet.status=((side==="OVER")?(real>row.line):(real<row.line))?"won":"lost";
         }
       }
       bets.push(bet);
@@ -724,8 +765,41 @@ function bankrollBets(){
   return bets;
 }
 var _bankBets=[];
+function bankCurveSVG(settled){
+  if(settled.length<2)return '';
+  var arr=settled.slice().sort(function(x,y){return x.date<y.date?-1:1;});
+  var cum=0,pts=arr.map(function(b){cum+=(b.profit||0);return cum;});
+  var mn=Math.min.apply(null,pts.concat([0])), mx=Math.max.apply(null,pts.concat([0]));
+  var W=600,H=120,pad=6,n=pts.length;
+  function X(i){return pad+i*(W-2*pad)/(n-1);}
+  function Y(v){var rng=(mx-mn)||1;return H-pad-(v-mn)/rng*(H-2*pad);}
+  var d=pts.map(function(v,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);}).join(' ');
+  var last=pts[n-1],col=last>=0?'var(--good)':'var(--bad)';
+  return '<div class="secTitle">Évolution de la bankroll (bénéfice cumulé)</div>'+
+    '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:120px;background:var(--panel2);border:1px solid var(--line);border-radius:9px">'+
+    '<line x1="0" y1="'+Y(0).toFixed(1)+'" x2="'+W+'" y2="'+Y(0).toFixed(1)+'" stroke="var(--line)"/>'+
+    '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2"/></svg>'+
+    '<div class="small muted" style="margin:2px 0 8px">Fin : '+(last>=0?'+':'')+frn(r2(last))+' € sur '+n+' paris réglés.</div>';
+}
+function segmentsHTML(settled){
+  if(!settled.length)return '';
+  function grp(keyFn,title){
+    var g={};
+    settled.forEach(function(b){var k=keyFn(b)||"—";g[k]=g[k]||{n:0,st:0,gn:0,w:0};g[k].n++;g[k].st+=b.stake;g[k].gn+=(b.gain||0);if(b.status==="won")g[k].w++;});
+    var rows=Object.keys(g).map(function(k){var x=g[k],pr=x.gn-x.st;return {k:k,n:x.n,roi:x.st?Math.round(pr/x.st*100):0,pr:pr,wr:Math.round(x.w/x.n*100)};}).sort(function(a,b){return b.roi-a.roi;});
+    return '<div class="secTitle">'+title+'</div><table><thead><tr><th>Segment</th><th class="num">Paris</th><th class="num">Réussite</th><th class="num">ROI</th><th class="num">Bénéfice</th></tr></thead><tbody>'+
+      rows.map(function(r){return '<tr><td>'+r.k+'</td><td class="num">'+r.n+'</td><td class="num">'+r.wr+'%</td><td class="num" style="color:'+(r.roi>=0?'var(--good)':'var(--bad)')+'">'+(r.roi>=0?'+':'')+r.roi+'%</td><td class="num">'+(r.pr>=0?'+':'')+frn(r2(r.pr))+' €</td></tr>';}).join("")+'</tbody></table>';
+  }
+  function mtype(b){if(MK_TOTALS[b.market])return "Totaux tirs";if(/ShotOnGoal|Shots on|Shots\./i.test(b.market))return "Tirs (équipe)";if(b.market==="Goals Over/Under")return "Buts";if(/corner/i.test(b.market))return "Corners";if(/card/i.test(b.market))return "Cartons";return b.market;}
+  return grp(mtype,"Par marché")+grp(function(b){return b.comp;},"Par compétition")+grp(function(b){return b.book;},"Par bookmaker");
+}
 function buildBankroll(){
   var mScope=$("bkScope").value, status=$("bkStatus").value, fFrom=$("bkFrom").value, fTo=$("bkTo").value;
+  var mode=$("bkStake")?$("bkStake").value:"flat", KCAP=1000;
+  function stakeOf(b){
+    if(mode==="kelly"){var bb=b.odd-1;if(bb<=0)return 0;var f=(bb*b.prob-(1-b.prob))/bb;f=Math.max(0,f)*0.5;f=Math.min(f,0.1);return Math.round(f*KCAP);}
+    return STAKE;
+  }
   var bets=bankrollBets().filter(function(b){
     if(mScope==="totals"&&!MK_TOTALS[b.market])return false;
     if(mScope==="teams"&&MK_TOTALS[b.market])return false;
@@ -733,40 +807,90 @@ function buildBankroll(){
     if(fTo&&b.date>fTo)return false;
     return true;
   });
+  bets.forEach(function(b){
+    b.stake=stakeOf(b);
+    if(b.status==="won")b.gain=r2(b.stake*b.odd);
+    else if(b.status==="push")b.gain=b.stake;
+    else if(b.status==="lost")b.gain=0;
+    else b.gain=null;
+    b.profit=(b.gain==null)?null:r2(b.gain-b.stake);
+  });
   _bankBets=bets;
-  var settled=bets.filter(function(b){return b.status==="won"||b.status==="lost"||b.status==="push";});
+  var settled=bets.filter(function(b){return b.status!=="pending";});
   var won=settled.filter(function(b){return b.status==="won";}).length;
   var staked=settled.reduce(function(s,b){return s+b.stake;},0);
   var gain=settled.reduce(function(s,b){return s+(b.gain||0);},0);
   var profit=r2(gain-staked), roi=staked?r1(profit/staked*100):0;
   var wr=settled.length?Math.round(won/settled.length*100):0;
   var pending=bets.filter(function(b){return b.status==="pending";}).length;
+  var clvVals=settled.filter(function(b){return b.clv!=null;}).map(function(b){return b.clv;});
+  var avgClv=clvVals.length?r1(mean(clvVals)):null;
   $("bkCards").innerHTML=
     '<div class="card '+(profit>=0?'g':'w')+'"><div class="v">'+(profit>=0?'+':'')+frn(profit)+' €</div><div class="k">Bénéfice net</div></div>'+
     '<div class="card '+(roi>=0?'g':'w')+'"><div class="v">'+(roi>=0?'+':'')+frn(roi)+' %</div><div class="k">ROI</div></div>'+
     '<div class="card"><div class="v">'+settled.length+'</div><div class="k">Paris réglés</div></div>'+
     '<div class="card"><div class="v">'+wr+'%</div><div class="k">Taux de réussite</div></div>'+
     '<div class="card"><div class="v">'+frn(staked)+' €</div><div class="k">Total misé</div></div>'+
+    '<div class="card"><div class="v">'+(avgClv==null?"—":((avgClv>=0?'+':'')+frn(avgClv)+'%'))+'</div><div class="k">CLV moyen</div></div>'+
     '<div class="card"><div class="v">'+pending+'</div><div class="k">En attente</div></div>';
+  $("bkCurve").innerHTML=bankCurveSVG(settled);
+  $("bkSegments").innerHTML=segmentsHTML(settled);
   var rowsToShow=bets.filter(function(b){if(status==="settled")return b.status!=="pending";if(status==="pending")return b.status==="pending";return true;});
   var body=rowsToShow.map(function(b){
     var stPill=b.status==="won"?'<span class="pill W">gagné</span>':b.status==="lost"?'<span class="pill L">perdu</span>':b.status==="push"?'<span class="pill D">remb.</span>':'<span class="pill D">en attente</span>';
-    var gainTxt=b.status==="pending"?"—":frn(b.gain);
-    var profTxt=b.status==="pending"?"—":((b.profit>=0?'+':'')+frn(b.profit));
-    return '<tr><td class="small muted">'+dm(b.date)+timeTag(b.dt)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num">'+frn(b.odd)+'</td><td class="num">'+b.stake+'</td><td>'+stPill+'</td><td class="num">'+gainTxt+'</td><td class="num">'+profTxt+'</td></tr>';
+    var gainTxt=b.gain==null?"—":frn(b.gain);
+    var profTxt=b.profit==null?"—":((b.profit>=0?'+':'')+frn(b.profit));
+    var clvTxt=b.clv==null?"—":((b.clv>=0?'+':'')+frn(b.clv)+'%');
+    return '<tr><td class="small muted">'+dm(b.date)+timeTag(b.dt)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num">'+frn(b.odd)+'</td><td class="num">'+b.stake+'</td><td>'+stPill+'</td><td class="num">'+gainTxt+'</td><td class="num">'+profTxt+'</td><td class="num small">'+clvTxt+'</td></tr>';
   }).join("");
-  $("bkBody").innerHTML=body||'<tr><td colspan="9" class="muted" style="text-align:center;padding:18px">Aucun pari avec de vraies cotes pour ce filtre. La bankroll se remplira quand les matchs à venir (cotes déjà captées) auront été joués.</td></tr>';
+  $("bkBody").innerHTML=body||'<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Aucun pari avec de vraies cotes pour ce filtre. La bankroll se remplira quand les matchs à venir (cotes déjà captées) auront été joués.</td></tr>';
+}
+function valueBets(){
+  if(typeof ODDS==="undefined"||!ODDS)return [];
+  var out=[];
+  Object.keys(ODDS).forEach(function(fid){
+    var o=ODDS[fid];if(!o||!o.markets)return;
+    if(findPlayed(o.h,o.a,o.date))return;
+    for(var mk in o.markets){
+      var m=o.markets[mk],row=oddsRowFor(m);if(!row)continue;
+      var pe=marketPre(mk,o.h,o.a,o.date);if(!pe)continue;
+      var pOver=1-normCdf(row.line,pe.exp,pe.sd);
+      var side=pOver>=0.5?"OVER":"UNDER", myP=side==="OVER"?pOver:1-pOver;
+      var odd=side==="OVER"?row.over:row.under;if(!odd||odd<1.01)continue;
+      var imp=side==="OVER"?(1/row.over)/((1/row.over)+(1/row.under)):(1/row.under)/((1/row.over)+(1/row.under));
+      out.push({date:o.date,dt:o.dt,home:o.h,away:o.a,book:m.book||"",market:mk,label:(MK_LABEL[mk]||mk)+" "+side+" "+frn(row.line),odd:odd,myP:Math.round(myP*100),imp:Math.round(imp*100),edge:r1((myP-imp)*100),ev:r1((myP*odd-1)*100)});
+    }
+  });
+  out.sort(function(a,b){return b.ev-a.ev;});
+  return out;
+}
+function buildValueBets(){
+  var scope=$("vbScope").value;
+  var rows=valueBets().filter(function(b){return scope==="value"?b.ev>0:true;});
+  $("vbBody").innerHTML=rows.map(function(b){
+    return '<tr><td class="small muted">'+dm(b.date)+timeTag(b.dt)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num">'+frn(b.odd)+'</td><td class="num">'+b.myP+'%</td><td class="num">'+b.imp+'%</td><td class="num" style="color:'+(b.edge>=0?'var(--good)':'var(--bad)')+'">'+(b.edge>=0?'+':'')+frn(b.edge)+'</td><td class="num" style="color:'+(b.ev>=0?'var(--good)':'var(--muted)')+'">'+(b.ev>=0?'+':'')+frn(b.ev)+'%</td></tr>';
+  }).join("")||'<tr><td colspan="9" class="muted" style="text-align:center;padding:18px">Pas de cotes de matchs à venir pour l\'instant — le collecteur les capte au fil des heures.</td></tr>';
+  var pos=rows.filter(function(b){return b.ev>0;}).length;
+  $("vbCount").textContent=rows.length+" paris analysés"+(pos?(" · "+pos+" à valeur positive"):"");
+}
+function buildCalibration(){
+  var buckets={};
+  function add(rc,real){if(!rc||real==null)return;var p=rc.prob/100,hit=((real>rc.line)===(rc.side==="over"))?1:0,bk=Math.min(9,Math.floor(p*10));buckets[bk]=buckets[bk]||{n:0,h:0,ps:0};buckets[bk].n++;buckets[bk].h+=hit;buckets[bk].ps+=p;}
+  Object.keys(TEAMS).forEach(function(n){TEAMS[n].matches.forEach(function(m){if(!m.home)return;var pm=predictAt(n,m.opp,true,m.date);if(!pm)return;add(pm.recoShots,m.ts);add(pm.recoSot,m.sot);});});
+  var rows='';
+  for(var i=9;i>=5;i--){var b=buckets[i];if(!b)continue;var pred=Math.round(b.ps/b.n*100),act=Math.round(b.h/b.n*100);rows+='<tr><td>'+(i*10)+'–'+(i*10+10)+'%</td><td class="num">'+b.n+'</td><td class="num">'+pred+'%</td><td class="num">'+act+'%</td><td class="num" style="color:'+(Math.abs(pred-act)<=8?'var(--good)':'var(--warn)')+'">'+(act-pred>=0?'+':'')+(act-pred)+'</td></tr>';}
+  $("calBody").innerHTML=rows||'<tr><td colspan="5" class="muted" style="text-align:center;padding:14px">Pas encore assez de données.</td></tr>';
 }
 function exportBankrollCSV(){
   var bets=(_bankBets&&_bankBets.length)?_bankBets:bankrollBets();
   var sep=";";
   function q(s){s=String(s==null?"":s);if(/[";\n]/.test(s))s='"'+s.replace(/"/g,'""')+'"';return s;}
-  var head=["Date","Sport","Compétition","Match","Intitulé du pari","Bookmaker","Cote","Mise","Gain","Bénéfice","Résultat"];
+  var head=["Date","Sport","Compétition","Match","Intitulé du pari","Bookmaker","Cote","Mise","Gain","Bénéfice","Résultat","CLV %"];
   var lines=[head.join(sep)];
   bets.forEach(function(b){
     if(b.status==="pending")return;
     var res=b.status==="won"?"Gagné":b.status==="lost"?"Perdu":"Remboursé";
-    lines.push([dmy(b.date),"Football",b.comp||"",fr(b.home)+" - "+fr(b.away),b.label,b.book,frn(b.odd),b.stake,frn(b.gain),frn(b.profit),res].map(q).join(sep));
+    lines.push([dmy(b.date),"Football",b.comp||"",fr(b.home)+" - "+fr(b.away),b.label,b.book,frn(b.odd),b.stake,frn(b.gain),frn(b.profit),res,b.clv==null?"":frn(b.clv)].map(q).join(sep));
   });
   if(lines.length<2){alert("Aucun pari réglé à exporter pour l'instant.");return;}
   var csv="﻿"+lines.join("\r\n");
@@ -787,16 +911,18 @@ window.addEventListener("DOMContentLoaded",function(){
   });});
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest(); buildBankroll();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
+  if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
   $("q").addEventListener("input",renderTeamList);
   $("fcat").addEventListener("change",function(){populateTeamFilters();renderTeamList();});
   $("fcomp").addEventListener("change",function(){populateSeasonOptions();renderTeamList();});
   $("fseason").addEventListener("change",renderTeamList);
   ["btTeam","btComp","btSeason","btMetric","btScope","btFrom","btTo"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   $("btReset").addEventListener("click",function(){$("btFrom").value="";$("btTo").value="";buildBacktest();});
-  ["bkScope","bkStatus","bkFrom","bkTo"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
+  ["bkScope","bkStatus","bkFrom","bkTo","bkStake"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
   $("bkReset").addEventListener("click",function(){$("bkFrom").value="";$("bkTo").value="";buildBankroll();});
   $("bkExport").addEventListener("click",exportBankrollCSV);
+  $("vbScope").addEventListener("change",buildValueBets);
   document.querySelectorAll(".tabs .tab").forEach(function(t){t.addEventListener("click",function(){if(t.dataset.tab)selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});

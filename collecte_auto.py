@@ -99,7 +99,9 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
 
 ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
-    "home total shotongoal","away total shotongoal","home shots on target","away shots on target"}
+    "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
+    "goals over/under","corners over under","total corners","total - corners",
+    "cards over/under","total cards","total - cards"}
 def _parse_ou(values):
     over={}; under={}
     for v in (values or []):
@@ -157,12 +159,20 @@ def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=40):
     cand.sort(key=lambda x: x[1].get("date",""), reverse=True)
     cand.sort(key=lambda x: 0 if x[1].get("wc") else 1)
     rc_items=cand[:rc_limit]
+    now_iso=datetime.datetime.now(datetime.timezone.utc).isoformat()
     for fid,u in up_items+rc_items:
         if not can_continue(used): break
         markets=_fetch_markets(fid, used)
         if markets is None: break
         if markets:  # on n'ecrase jamais des cotes existantes par du vide (match deja joue)
-            odds[fid]={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets}
+            prev=odds.get(fid) or {}
+            entry={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets,"t1":now_iso}
+            # CLV : on conserve le tout premier releve de cotes (ouverture)
+            if prev.get("open"):
+                entry["open"]=prev["open"]; entry["t0"]=prev.get("t0",now_iso)
+            else:
+                entry["open"]=markets; entry["t0"]=now_iso
+            odds[fid]=entry
     json.dump(odds,open(ODDSFILE,"w",encoding="utf-8"))
     return odds
 
@@ -285,6 +295,7 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
         ln=m.get("lname","")
         if ln: comp_cat[ln]="club" if str(m.get("lid")) in club_lids else "nation"
     payload=("// Genere automatiquement (GitHub Actions). Maj: "+datetime.datetime.now(datetime.timezone.utc).strftime("%d/%m/%Y %H:%M")+" UTC\n"
+        "var GENERATED = "+json.dumps(datetime.datetime.now(datetime.timezone.utc).isoformat())+";\n"
         "var LEAGUE_AVG = "+json.dumps(la)+";\n"
         "var COMPS = "+json.dumps(comps,ensure_ascii=False)+";\n"
         "var COMP_CAT = "+json.dumps(comp_cat,ensure_ascii=False)+";\n"
