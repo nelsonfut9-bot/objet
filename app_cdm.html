@@ -140,13 +140,15 @@
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
       <p class="small muted">Backtest 100% honnête : pour chaque match, l'estimation n'utilise QUE les matchs joués AVANT cette date — jamais le match lui-même, jamais les matchs postérieurs. Comme si je n'avais pas vu le résultat. Cliquez une ligne pour voir le détail et la prédiction d'avant-match.</p>
       <div class="filterbar">
+        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option></select></div>
+        <div class="field"><label>Portée</label><select id="btScope"><option value="all">Tout (équipes + match)</option><option value="teams">Par équipe (A &amp; B)</option><option value="match">Match (total) seulement</option></select></div>
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
         <div class="field"><label>Saison</label><select id="btSeason"></select></div>
-        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option></select></div>
       </div>
+      <p class="small muted" style="margin:0 0 8px">Équipe A = domicile, Équipe B = extérieur, Match = total des deux équipes. Chaque pari est jugé gagné/perdu séparément.</p>
       <div class="cards" id="scoreCards"></div>
-      <table id="bt"><thead><tr><th>Date</th><th>Match</th><th>Conseil</th><th class="num">Estim.</th><th class="num">Réel</th><th>Pari</th></tr></thead><tbody></tbody></table>
+      <table id="bt"><thead></thead><tbody></tbody></table>
     </div>
   </section>
   <footer style="color:var(--muted);font-size:11px;text-align:center;margin-top:18px">Données API-Football · mise à jour automatique quotidienne</footer>
@@ -177,7 +179,7 @@ function mean(a){a=a.filter(function(x){return x!=null;});return a.length?a.redu
 function std(a){a=a.filter(function(x){return x!=null;});if(a.length<2)return 1.7;var m=mean(a);return Math.sqrt(a.reduce(function(s,x){return s+(x-m)*(x-m);},0)/a.length);}
 function erf(x){var t=1/(1+0.3275911*Math.abs(x));var y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return x>=0?y:-y;}
 function normCdf(x,mu,sd){return 0.5*(1+erf((x-mu)/(sd*Math.SQRT2)));}
-function reco(mu,sd){var best=null;for(var L=Math.floor(mu-3)+0.5;L<=mu+3;L+=1){var p=1-normCdf(L,mu,sd),c=Math.max(p,1-p);if(c>0.85)continue;var sc=c-Math.abs(L-mu)*0.01;if(!best||sc>best.s)best={line:L,side:p>=0.5?"over":"under",prob:Math.round(c*100),s:sc};}if(!best){var L2=Math.round(mu-0.5)+0.5,p2=1-normCdf(L2,mu,sd);best={line:L2,side:p2>=0.5?"over":"under",prob:Math.round(Math.max(p2,1-p2)*100)};}return best;}
+function reco(mu,sd){var best=null;for(var L=Math.floor(mu-3)+0.5;L<=mu+3;L+=1){if(L<0.5)continue;var p=1-normCdf(L,mu,sd),c=Math.max(p,1-p);if(c>0.85)continue;var sc=c-Math.abs(L-mu)*0.01;if(!best||sc>best.s)best={line:L,side:p>=0.5?"over":"under",prob:Math.round(c*100),s:sc};}if(!best){var L2=Math.max(0.5,Math.round(mu-0.5)+0.5),p2=1-normCdf(L2,mu,sd);best={line:L2,side:p2>=0.5?"over":"under",prob:Math.round(Math.max(p2,1-p2)*100)};}return best;}
 
 var C={champ:{l:"Championnat",m:1.0},ucl:{l:"Ligue des Champions",m:1.03},uel:{l:"Ligue Europa",m:1.0},
   coupe:{l:"Coupe nationale",m:0.97},wc:{l:"Coupe du Monde",m:1.02},euro:{l:"Euro / Copa",m:1.02},
@@ -423,7 +425,7 @@ function predict(name,opp,isHome,compKey){
   function pO(thr,mu,s){return Math.round((1-normCdf(thr,mu,s))*100);}
   return {name:name,opp:opp,isHome:isHome,exp:r1(exp),expSot:r1(expSot),sd:r1(sd),sdSot:r1(sdSot),
     form5:r1(form5),form10:r1(form10),oppCd:r1(oc),defF:defF,xg:xgf.length?r2(mean(xgf)):null,
-    intv:[Math.round(exp-0.85*sd),Math.round(exp+0.85*sd)],intvS:[Math.round(expSot-0.85*sdSot),Math.round(expSot+0.85*sdSot)],
+    intv:[Math.max(0,Math.round(exp-0.85*sd)),Math.max(0,Math.round(exp+0.85*sd))],intvS:[Math.max(0,Math.round(expSot-0.85*sdSot)),Math.max(0,Math.round(expSot+0.85*sdSot))],
     recoShots:rc,recoSot:rcs,
     probs:[[13.5,pO(13.5,exp,sd)],[15.5,pO(15.5,exp,sd)],[17.5,pO(17.5,exp,sd)]],
     probsS:[[4.5,pO(4.5,expSot,sdSot)],[5.5,pO(5.5,expSot,sdSot)],[6.5,pO(6.5,expSot,sdSot)]]};
@@ -492,6 +494,7 @@ function runAnalyse(){
     $("result").innerHTML='<div class="secTitle" style="margin-top:0">'+fr(h)+' (domicile) vs '+fr(a)+' (extérieur) — '+(C[ck]?C[ck].l:"")+'</div>'+
       '<div class="est">'+teamCard(Rh,"Domicile")+teamCard(Ra,"Extérieur")+'</div>'+
       betAdvice(od,Rh,Ra)+oddsHTML(od);
+    try{$("result").scrollIntoView({behavior:"smooth",block:"start"});}catch(e2){}
   }catch(e){
     $("result").classList.remove("hidden");
     $("result").innerHTML='<div class="err">Erreur d analyse : '+(e&&e.message?e.message:e)+'</div>';
@@ -499,9 +502,26 @@ function runAnalyse(){
 }
 
 // ---- backtest ----
+// valeur réelle d'un côté (domicile / extérieur) pour un match donné
+function realSide(m,metric,side){
+  if(side==="home")return m[metric];
+  if(m.o&&m.o[metric]!=null)return m.o[metric];
+  return metric==="sot"?m.a_sot:m.a_ts;
+}
+// conseil OVER/UNDER pour le total du match (somme des deux équipes)
+function recoTotal(eH,sdH,eA,sdA){var mu=eH+eA,sd=Math.sqrt(sdH*sdH+sdA*sdA);return {mu:mu,sd:sd,rc:reco(mu,sd)};}
+// 1 si le pari est gagné, 0 si perdu, null si non calculable
+function judge(real,rc){if(rc==null||real==null)return null;var ao=real>rc.line;return (rc.side==="over")===ao?1:0;}
+// cellule "conseil → réel ✓/✗"
+function btCell(rc,real){
+  if(rc==null||real==null)return '<td class="small muted">—</td>';
+  var ok=judge(real,rc)===1;
+  return '<td class="small">'+(rc.side==="over"?"OVER ":"UNDER ")+frn(rc.line)+' → <b>'+r1(real)+'</b> '+(ok?'<span class="pill W">✓</span>':'<span class="pill L">✗</span>')+'</td>';
+}
 function buildBacktest(){
-  var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value;
+  var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value, scope=$("btScope").value;
   var unit=metric==="sot"?"tirs cadrés":"tirs";
+  var showA=scope!=="match", showB=scope!=="match", showM=scope!=="teams";
   var rows=[];
   Object.keys(TEAMS).forEach(function(n){
     if(fTeam&&fTeam!=="all"&&n!==fTeam)return;
@@ -509,25 +529,47 @@ function buildBacktest(){
       if(!m.home)return;
       if(fComp&&fComp!=="all"&&m.comp!==fComp)return;
       if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
-      var pm=predictAt(n,m.opp,true,m.date); if(!pm)return;
-      var real=m[metric];
-      var rc=metric==="sot"?pm.recoSot:pm.recoShots;
-      var exp=metric==="sot"?pm.expSot:pm.exp;
-      var line=rc.line, over=rc.side==="over";
-      rows.push({date:m.date,name:n,opp:m.opp,match:fr(n)+" - "+fr(m.opp),lbl:(over?"OVER ":"UNDER ")+frn(line)+" "+unit,pred:r1(exp),real:real,thr:line,over:over});
+      var pmH=predictAt(n,m.opp,true,m.date); if(!pmH)return;
+      var pmA=predictAt(m.opp,n,false,m.date);
+      var rcH=metric==="sot"?pmH.recoSot:pmH.recoShots;
+      var eH=metric==="sot"?pmH.expSot:pmH.exp, sdH=metric==="sot"?pmH.sdSot:pmH.sd;
+      var realH=realSide(m,metric,"home");
+      var rcA=null,realA=null,rcM=null,realM=null;
+      if(pmA){
+        var eA=metric==="sot"?pmA.expSot:pmA.exp, sdA=metric==="sot"?pmA.sdSot:pmA.sd;
+        rcA=metric==="sot"?pmA.recoSot:pmA.recoShots; realA=realSide(m,metric,"away");
+        rcM=recoTotal(eH,sdH,eA,sdA).rc;
+        realM=(realH!=null&&realA!=null)?(realH+realA):null;
+      }
+      rows.push({date:m.date,name:n,opp:m.opp,rcH:rcH,realH:realH,rcA:rcA,realA:realA,rcM:rcM,realM:realM});
     });
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
-  rows=rows.slice(0,60);
-  var bet=0,err=0;
-  document.querySelector("#bt tbody").innerHTML=rows.map(function(r){
-    var ao=r.real>r.thr, ok=r.over===ao; if(ok)bet++; err+=Math.abs(r.real-r.pred);
-    return '<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+'</td><td>'+r.match+'</td><td><span class="pill '+(r.over?"W":"L")+'">'+r.lbl+'</span></td><td class="num"><b>'+r.pred+'</b></td><td class="num">'+r.real+'</td><td><span class="pill '+(ok?"W":"L")+'">'+(ok?"gagné":"perdu")+'</span></td></tr>';
-  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Pas encore assez de données pour ce filtre.</td></tr>';
-  var n=rows.length||1;
-  $("scoreCards").innerHTML='<div class="card g"><div class="v">'+(rows.length?Math.round(bet/n*100)+"%":"—")+'</div><div class="k">Paris corrects</div></div>'+
-    '<div class="card w"><div class="v">'+(rows.length?(err/n).toFixed(1):"—")+'</div><div class="k">Erreur moyenne ('+unit+')</div></div>'+
-    '<div class="card"><div class="v">'+rows.length+'</div><div class="k">Matchs testés</div></div>';
+  rows=rows.slice(0,80);
+  var lblMetric=metric==="sot"?"cadrés":"tirs";
+  var th='<tr><th>Date</th><th>Match (A – B)</th>';
+  if(showA)th+='<th>Équipe A ('+lblMetric+')</th>';
+  if(showB)th+='<th>Équipe B ('+lblMetric+')</th>';
+  if(showM)th+='<th>Match total ('+lblMetric+')</th>';
+  th+='</tr>';
+  document.querySelector("#bt thead").innerHTML=th;
+  var okA=0,nA=0,okB=0,nB=0,okM=0,nM=0;
+  var body=rows.map(function(r){
+    var tr='<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+'</td><td>'+fr(r.name)+' <span class="muted">–</span> '+fr(r.opp)+'</td>';
+    if(showA){tr+=btCell(r.rcH,r.realH);var ja=judge(r.realH,r.rcH);if(ja!=null){nA++;okA+=ja;}}
+    if(showB){tr+=btCell(r.rcA,r.realA);var jb=judge(r.realA,r.rcA);if(jb!=null){nB++;okB+=jb;}}
+    if(showM){tr+=btCell(r.rcM,r.realM);var jm=judge(r.realM,r.rcM);if(jm!=null){nM++;okM+=jm;}}
+    return tr+'</tr>';
+  }).join("");
+  var colspan=2+(showA?1:0)+(showB?1:0)+(showM?1:0);
+  document.querySelector("#bt tbody").innerHTML=body||'<tr><td colspan="'+colspan+'" class="muted" style="text-align:center;padding:18px">Pas encore assez de données pour ce filtre.</td></tr>';
+  function pct(ok,n){return n?Math.round(ok/n*100)+"%":"—";}
+  var cards='';
+  if(showA)cards+='<div class="card g"><div class="v">'+pct(okA,nA)+'</div><div class="k">Équipe A correct ('+unit+', '+nA+')</div></div>';
+  if(showB)cards+='<div class="card g"><div class="v">'+pct(okB,nB)+'</div><div class="k">Équipe B correct ('+unit+', '+nB+')</div></div>';
+  if(showM)cards+='<div class="card g"><div class="v">'+pct(okM,nM)+'</div><div class="k">Match total correct ('+unit+', '+nM+')</div></div>';
+  cards+='<div class="card"><div class="v">'+rows.length+'</div><div class="k">Matchs testés</div></div>';
+  $("scoreCards").innerHTML=cards;
   document.querySelectorAll("#bt tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(tr.dataset.n,tr.dataset.d,tr.dataset.o);});});
 }
 
@@ -584,7 +626,7 @@ window.addEventListener("DOMContentLoaded",function(){
   $("q").addEventListener("input",renderTeamList);
   $("fcomp").addEventListener("change",renderTeamList);
   $("fseason").addEventListener("change",renderTeamList);
-  ["btTeam","btComp","btSeason","btMetric"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
+  ["btTeam","btComp","btSeason","btMetric","btScope"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
   document.querySelectorAll(".tab").forEach(function(t){t.addEventListener("click",function(){selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});
