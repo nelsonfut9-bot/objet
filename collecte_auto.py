@@ -11,7 +11,7 @@ import json, os, sys, time, math, datetime
 API_KEY  = os.environ.get("API_FOOTBALL_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
 OUTPUT   = "donnees_cdm.js"; PROGRESS="progress.json"; MATCHES="matches.json"
-SAFETY_MARGIN=60; MAX_RUN=40000; MAX_PER_TEAM=80; SLEEP=0.10
+SAFETY_MARGIN=60; MAX_RUN=2000; MAX_PER_TEAM=80; SLEEP=0.10  # MAX_RUN volontairement bas : on sauvegarde souvent (checkpoints)
 WC_LEAGUE=1; WC_SEASON=2026; PRIORITY_SEASONS=[2020,2021,2022,2023,2024,2025,2026]
 
 COMPETITIONS=[
@@ -64,16 +64,25 @@ _rem=[None]
 def api_get(path,params,used):
     import requests
     if used[0]>=MAX_RUN: raise Stop()
-    r=requests.get(BASE_URL+path,headers={"x-apisports-key":API_KEY},params=params,timeout=30)
-    used[0]+=1
-    rem=r.headers.get("x-ratelimit-requests-remaining")
-    if rem is not None:
-        try: _rem[0]=int(rem)
-        except: pass
-    if r.status_code==429: print("  429 -> quota."); raise Stop()
-    r.raise_for_status(); data=r.json()
-    if data.get("errors"): print("  ! API:",data["errors"])
-    return data.get("response",[])
+    last=None
+    for attempt in range(4):
+        try:
+            r=requests.get(BASE_URL+path,headers={"x-apisports-key":API_KEY},params=params,timeout=30)
+            used[0]+=1
+            rem=r.headers.get("x-ratelimit-requests-remaining")
+            if rem is not None:
+                try: _rem[0]=int(rem)
+                except: pass
+            if r.status_code==429: print("  429 -> quota."); raise Stop()
+            r.raise_for_status(); data=r.json()
+            if data.get("errors"): print("  ! API:",data["errors"])
+            return data.get("response",[])
+        except Stop:
+            raise
+        except Exception as e:
+            last=e; time.sleep(1.5*(attempt+1))  # erreur reseau transitoire -> on retente
+    # apres plusieurs echecs reseau : on s'arrete proprement (les donnees deja collectees seront sauvegardees)
+    print("  ! reseau (abandon apres retries):",last); raise Stop()
 def can_continue(used):
     if used[0]>=MAX_RUN: return False
     if _rem[0] is not None and _rem[0]<=SAFETY_MARGIN: return False
@@ -272,7 +281,10 @@ def run():
                 recent_ft[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date"),"wc":iswc}
         odds=collect_odds(progress["upcoming_raw"], recent_ft, used)
     except Stop:
-        print("  Pause (quota/plafond). Reprise au prochain run.")
+        print("  Pause (quota/plafond/reseau). Reprise au prochain run.")
+    except Exception as e:
+        import traceback; print("  ! erreur inattendue, sauvegarde partielle:",e); traceback.print_exc()
+    # on sauvegarde TOUJOURS ce qui a ete collecte (meme apres une erreur)
     progress["pending_fixtures"]=[it for it in progress["pending_fixtures"] if it["fid"] not in matches]
     aggregate_and_write(matches, progress["upcoming_raw"], odds)
     json.dump(progress,open(PROGRESS,"w",encoding="utf-8")); json.dump(matches,open(MATCHES,"w",encoding="utf-8"))
