@@ -55,6 +55,23 @@ echantillon(39,  2025, "PremierLeague_2025")
 echantillon(140, 2025, "LaLiga_2025")
 echantillon(135, 2025, "SerieA_2025")
 
+# statut EXACT de fixtures precises (matchs signales : Pays-Bas-Maroc, Allemagne-Paraguay, etc.)
+try:
+    check = {}
+    for fid in ["1562345", "1565176", "1561329", "1567311"]:
+        j = get("/fixtures", {"id": fid})
+        r = j.get("response") or []
+        if r:
+            fx = r[0]; stt = fx["fixture"]["status"]
+            check[fid] = {"h": fx["teams"]["home"]["name"], "a": fx["teams"]["away"]["name"],
+                          "date": fx["fixture"]["date"][:10], "status": stt.get("short"),
+                          "detail": stt.get("long"), "score": str(fx.get("goals", {}).get("home")) + "-" + str(fx.get("goals", {}).get("away"))}
+        else:
+            check[fid] = "aucune reponse"
+    out["fixtures_check"] = check
+except Exception as e:
+    out["erreur_fixtures_check"] = str(e)
+
 json.dump(out, open("odds_probe.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 print("Types de paris 'tirs':", len(out.get("types_de_paris_tirs", [])))
 for k in ("CoupeDuMonde_2026","PremierLeague_2025","LaLiga_2025","SerieA_2025"):
