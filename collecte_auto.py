@@ -240,6 +240,15 @@ def run():
             # ne valide la cle QUE si des matchs sont revenus (sinon on retentera au prochain run)
             if resp: progress["fixtures_done"][key]=True
             time.sleep(SLEEP)
+        # matchs "a venir" dont la date est passee -> on re-interroge le match pour recuperer
+        # le resultat (sinon les calendriers etant en cache, les matchs finis ne sont jamais detectes)
+        today_s=datetime.date.today().isoformat()
+        due=[(fid,u) for fid,u in list(progress["upcoming_raw"].items()) if u.get("date","")<=today_s and fid not in matches]
+        for fid,u in due[:60]:
+            if not can_continue(used): raise Stop()
+            resp=api_get("/fixtures",{"id":fid},used)
+            add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],None,True)
+            time.sleep(SLEEP)
         seen=set(); pend=[]
         for it in progress["pending_fixtures"]:
             if it["fid"] in matches or it["fid"] in seen: continue
