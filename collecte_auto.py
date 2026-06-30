@@ -218,30 +218,8 @@ def run():
             progress["priority_teams"]=alive if alive else allt
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],str(WC_LEAGUE),True)
             print("  Selections prioritaires:",len(progress["priority_teams"]))
-        # file de récupération des calendriers : sélections ET championnats de clubs EN ALTERNANCE
-        # (avant, les clubs n'étaient jamais atteints car les sélections épuisaient le quota)
-        nat_tasks=[]
-        for tid,name in list(progress["priority_teams"].items()):
-            for s in PRIORITY_SEASONS:
-                nat_tasks.append(("T%s_%s"%(tid,s), {"team":tid,"season":s}, None, True))
-        club_tasks=[]
-        for lid,label,cat,seasons in COMPETITIONS:
-            for s in seasons:
-                club_tasks.append(("%s_%s"%(lid,s), {"league":lid,"season":s}, str(lid), False))
-        fixture_tasks=[]; i=j=0
-        while i<len(nat_tasks) or j<len(club_tasks):
-            if j<len(club_tasks): fixture_tasks.append(club_tasks[j]); j+=1
-            if i<len(nat_tasks): fixture_tasks.append(nat_tasks[i]); i+=1
-        for key,params,lid,prio in fixture_tasks:
-            if progress["fixtures_done"].get(key): continue
-            if not can_continue(used): raise Stop()
-            resp=api_get("/fixtures",params,used)
-            add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],lid,prio)
-            # ne valide la cle QUE si des matchs sont revenus (sinon on retentera au prochain run)
-            if resp: progress["fixtures_done"][key]=True
-            time.sleep(SLEEP)
-        # matchs "a venir" dont la date est passee -> on re-interroge le match pour recuperer
-        # le resultat (sinon les calendriers etant en cache, les matchs finis ne sont jamais detectes)
+        # ===== PRIORITE 1 : RESULTATS RECENTS =====
+        # matchs "a venir" dont la date est passee -> on recupere le resultat (calendriers en cache sinon)
         today_s=datetime.date.today().isoformat()
         due=[(fid,u) for fid,u in list(progress["upcoming_raw"].items()) if u.get("date","")<=today_s and fid not in matches]
         for fid,u in due[:60]:
@@ -249,12 +227,25 @@ def run():
             resp=api_get("/fixtures",{"id":fid},used)
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],None,True)
             time.sleep(SLEEP)
+        # ===== PRIORITE 2 : COTES (rafraichies a CHAQUE passage, AVANT le backfill) =====
+        recent_ft={}
+        try:
+            cutoff=(datetime.date.today()-datetime.timedelta(days=12)).isoformat()
+            cutoff_wc=(datetime.date.today()-datetime.timedelta(days=90)).isoformat()
+        except:
+            cutoff="0000-00-00"; cutoff_wc="0000-00-00"
+        for fid,m in matches.items():
+            d=m.get("date",""); ln=(m.get("lname") or "")
+            iswc=(str(m.get("lid"))=="1") or ("World Cup" in ln) or ("Coupe du Monde" in ln)
+            if (iswc and d>=cutoff_wc) or d>=cutoff:
+                recent_ft[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date"),"wc":iswc}
+        odds=collect_odds(progress["upcoming_raw"], recent_ft, used)
+        # ===== PRIORITE 3 : STATS des matchs en attente (recents/selections d'abord) =====
         seen=set(); pend=[]
         for it in progress["pending_fixtures"]:
             if it["fid"] in matches or it["fid"] in seen: continue
             seen.add(it["fid"]); pend.append(it)
         pend.sort(key=lambda x:x["date"],reverse=True)
-        # alterne sélections / clubs pour que les deux se remplissent en parallèle
         _p=[it for it in pend if it.get("prio")]; _o=[it for it in pend if not it.get("prio")]
         pend=[]; pi=oi=0
         while pi<len(_p) or oi<len(_o):
@@ -275,20 +266,26 @@ def run():
         # nettoie les matchs deja joues de la liste "a venir"
         for fid in [k for k in progress["upcoming_raw"] if k in matches]:
             progress["upcoming_raw"].pop(fid, None)
-        # matchs recents joues -> tentative de captation des cotes pour la bankroll
-        # fenetre large pour la Coupe du Monde (en cours), plus courte pour le reste
-        recent_ft={}
-        try:
-            cutoff=(datetime.date.today()-datetime.timedelta(days=12)).isoformat()
-            cutoff_wc=(datetime.date.today()-datetime.timedelta(days=90)).isoformat()
-        except:
-            cutoff="0000-00-00"; cutoff_wc="0000-00-00"
-        for fid,m in matches.items():
-            d=m.get("date",""); ln=(m.get("lname") or "")
-            iswc=(str(m.get("lid"))=="1") or ("World Cup" in ln) or ("Coupe du Monde" in ln)
-            if (iswc and d>=cutoff_wc) or d>=cutoff:
-                recent_ft[fid]={"h":m.get("h"),"a":m.get("a"),"date":m.get("date"),"wc":iswc}
-        odds=collect_odds(progress["upcoming_raw"], recent_ft, used)
+        # ===== PRIORITE 4 : BACKFILL des calendriers (EN DERNIER) : selections + clubs en alternance =====
+        nat_tasks=[]
+        for tid,name in list(progress["priority_teams"].items()):
+            for s in PRIORITY_SEASONS:
+                nat_tasks.append(("T%s_%s"%(tid,s), {"team":tid,"season":s}, None, True))
+        club_tasks=[]
+        for lid,label,cat,seasons in COMPETITIONS:
+            for s in seasons:
+                club_tasks.append(("%s_%s"%(lid,s), {"league":lid,"season":s}, str(lid), False))
+        fixture_tasks=[]; i=j=0
+        while i<len(nat_tasks) or j<len(club_tasks):
+            if j<len(club_tasks): fixture_tasks.append(club_tasks[j]); j+=1
+            if i<len(nat_tasks): fixture_tasks.append(nat_tasks[i]); i+=1
+        for key,params,lid,prio in fixture_tasks:
+            if progress["fixtures_done"].get(key): continue
+            if not can_continue(used): raise Stop()
+            resp=api_get("/fixtures",params,used)
+            add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],lid,prio)
+            if resp: progress["fixtures_done"][key]=True
+            time.sleep(SLEEP)
     except Stop:
         print("  Pause (quota/plafond/reseau). Reprise au prochain run.")
     except Exception as e:
