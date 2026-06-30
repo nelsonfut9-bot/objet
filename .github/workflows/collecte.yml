@@ -2,12 +2,15 @@ name: Collecte automatique
 
 on:
   schedule:
-    # GitHub sature les crons a pile l'heure : on vise des minutes decalees,
-    # 3 tentatives par heure pour fiabiliser le declenchement.
-    - cron: "7 * * * *"
-    - cron: "27 * * * *"
-    - cron: "47 * * * *"
+    # GitHub saute/retarde souvent les crons gratuits : on multiplie les tentatives (toutes les 15 min).
+    - cron: "5 * * * *"
+    - cron: "20 * * * *"
+    - cron: "35 * * * *"
+    - cron: "50 * * * *"
   workflow_dispatch:
+  # declenchement externe fiable (ex: cron-job.org) via l'API GitHub repository_dispatch
+  repository_dispatch:
+    types: [collecte]
 
 permissions:
   contents: write
