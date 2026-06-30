@@ -575,6 +575,21 @@ function teamCard(R,lieu){
     recoHTML(R.recoShots,"Tirs "+fr(R.name))+recoHTML(R.recoSot,"Cadrés "+fr(R.name))+
     (R.xgExp!=null?'<div style="font-size:14px;margin-top:6px">Buts attendus (xG) : <span class="big" style="font-size:22px;color:var(--xg)">'+frn(R.xgExp)+'</span></div>'+recoHTML(R.recoXg,"xG "+fr(R.name)):'')+'</div>';
 }
+function whichTeamHTML(o,Rh,Ra){
+  if(!o||!o.which||(!o.which.shots&&!o.which.sot))return '';
+  if(!Rh||Rh.noData||!Ra||Ra.noData)return '';
+  function blk(lbl,w,eH,sdH,eA,sdA){
+    if(!w||w.home==null||w.away==null)return '';
+    var md=eH-eA, sd=Math.sqrt(sdH*sdH+sdA*sdA)||1;
+    var pHome=1-normCdf(0,md,sd), homeFav=pHome>=0.5;
+    var fav=homeFav?fr(Rh.name):fr(Ra.name), p=Math.round((homeFav?pHome:1-pHome)*100);
+    var favOdd=homeFav?w.home:w.away;
+    return '<div class="srow"><span class="lab">'+lbl+'</span><span>mon favori : <b style="color:var(--good)">'+fav+'</b> ('+p+'%) &middot; sa cote <b>'+frn(favOdd)+'</b> &middot; dom '+frn(w.home)+' / nul '+(w.draw?frn(w.draw):'—')+' / ext '+frn(w.away)+' &middot; '+(w.book||'')+'</span></div>';
+  }
+  var rows=blk("Tirs",o.which.shots,Rh.exp,Rh.sd,Ra.exp,Ra.sd)+blk("Tirs cadrés",o.which.sot,Rh.expSot,Rh.sdSot,Ra.expSot,Ra.sdSot);
+  if(!rows)return '';
+  return '<div class="secTitle">Quelle équipe tire le plus ? (cotes réelles)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Marché « 1X2 tirs » : quelle équipe aura le plus de tirs / cadrés. Mon favori = celle que mon modèle place devant.</div>'+rows+'</div>';
+}
 function matchTotalsHTML(Rh,Ra){
   if(!Rh||Rh.noData||!Ra||Ra.noData)return '';
   function L(lbl,h,a,dec){if(h==null||a==null)return '';var t=h+a;return '<div class="srow"><span class="lab">'+lbl+'</span><span><b>'+(dec?frn(r1(t)):Math.round(t))+'</b></span></div>';}
@@ -592,7 +607,7 @@ function runAnalyse(){
     var od=findOdds(h,a);
     $("result").innerHTML='<div class="secTitle" style="margin-top:0">'+fr(h)+' (domicile) vs '+fr(a)+' (extérieur) — '+(C[ck]?C[ck].l:"")+'</div>'+
       '<div class="est">'+teamCard(Rh,"Domicile")+teamCard(Ra,"Extérieur")+'</div>'+
-      matchTotalsHTML(Rh,Ra)+betAdvice(od,Rh,Ra)+oddsHTML(od);
+      matchTotalsHTML(Rh,Ra)+whichTeamHTML(od,Rh,Ra)+betAdvice(od,Rh,Ra)+oddsHTML(od);
     try{$("result").scrollIntoView({behavior:"smooth",block:"start"});}catch(e2){}
   }catch(e){
     $("result").classList.remove("hidden");

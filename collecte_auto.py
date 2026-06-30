@@ -110,6 +110,18 @@ ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
     "goals over/under"}
+# marches "quelle equipe tire le plus" (3 issues : domicile / nul / exterieur)
+WHICH_MARKETS={"shots.1x2":"shots","shotontarget 1x2":"sot"}
+def _parse_1x2(values):
+    d={}
+    for v in (values or []):
+        val=str(v.get("value","")).lower().strip(); od=v.get("odd")
+        try: od=float(od)
+        except: continue
+        if val in ("home","1"): d["home"]=od
+        elif val in ("away","2"): d["away"]=od
+        elif val in ("draw","x","égal","egal"): d["draw"]=od
+    return d if ("home" in d and "away" in d) else None
 def _parse_ou(values):
     over={}; under={}
     for v in (values or []):
@@ -139,22 +151,28 @@ def _balanced(rows):
             return round(a[0]+t*(b[0]-a[0]),1)
     return None
 def _fetch_markets(fid, used):
-    """Recupere les marches tirs/tirs cadres pour une fixture. None si quota/stop."""
+    """Recupere les marches tirs/cadres (O/U) + 'quelle equipe tire le plus' (1x2). None si quota/stop."""
     try: resp=api_get("/odds",{"fixture":fid},used)
     except Stop: return None
     time.sleep(SLEEP)
-    markets={}
+    markets={}; which={}
     for blk in resp:
         for bk in blk.get("bookmakers",[]):
             bname=bk.get("name")
             for bet in bk.get("bets",[]):
-                nm=(bet.get("name") or "")
-                if nm.lower() in ODDS_MARKETS:
+                nm=(bet.get("name") or ""); low=nm.lower()
+                if low in ODDS_MARKETS:
                     rows=_parse_ou(bet.get("values"))
                     if not rows: continue
                     if (nm not in markets) or (bname in ("Pinnacle","Bet365")):
                         markets[nm]={"book":bname,"rows":rows,"bl":_balanced(rows)}
-    return markets
+                elif low in WHICH_MARKETS:
+                    row=_parse_1x2(bet.get("values"))
+                    if not row: continue
+                    k=WHICH_MARKETS[low]
+                    if (k not in which) or (bname in ("Pinnacle","Bet365")):
+                        row["book"]=bname; which[k]=row
+    return (markets, which)
 
 def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=40):
     """Cotes des matchs a venir (rafraichies a chaque run pour approcher les cotes de cloture)
@@ -170,11 +188,12 @@ def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=40):
     now_iso=datetime.datetime.now(datetime.timezone.utc).isoformat()
     for fid,u in up_items+rc_items:
         if not can_continue(used): break
-        markets=_fetch_markets(fid, used)
-        if markets is None: break
-        if markets:  # on n'ecrase jamais des cotes existantes par du vide (match deja joue)
+        res=_fetch_markets(fid, used)
+        if res is None: break
+        markets, which = res
+        if markets or which:  # on n'ecrase jamais des cotes existantes par du vide (match deja joue)
             prev=odds.get(fid) or {}
-            entry={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets,"t1":now_iso}
+            entry={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets,"which":which,"t1":now_iso}
             # CLV : on conserve le tout premier releve de cotes (ouverture)
             if prev.get("open"):
                 entry["open"]=prev["open"]; entry["t0"]=prev.get("t0",now_iso)
