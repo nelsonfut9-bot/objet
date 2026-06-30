@@ -98,7 +98,7 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
         st=fx["fixture"]["status"]["short"]; fid=str(fx["fixture"]["id"]); lg=fx.get("league",{})
         lid=league_id if league_id is not None else str(lg.get("id",""))
         h=fx["teams"]["home"]["name"]; a=fx["teams"]["away"]["name"]
-        if st=="FT":
+        if st in ("FT","AET","PEN"):  # FT + prolongation (AET) + tirs au but (PEN) = match termine
             if fid in matches: continue
             pending.append({"fid":fid,"date":fx["fixture"]["date"][:10],"dt":fx["fixture"]["date"],"h":h,"a":a,
                 "league":str(lid),"lname":lg.get("name",""),"season":lg.get("season",""),
