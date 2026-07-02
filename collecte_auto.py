@@ -122,7 +122,18 @@ ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shoto
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
     "goals over/under"}
 # marches "quelle equipe tire le plus" (3 issues : domicile / nul / exterieur)
-WHICH_MARKETS={"shots.1x2":"shots","shotontarget 1x2":"sot"}
+WHICH_MARKETS={"shots.1x2":"shots","shotontarget 1x2":"sot","match winner":"mw"}
+DC_MARKETS={"double chance"}
+def _parse_dc(values):
+    d={}
+    for v in (values or []):
+        val=str(v.get("value","")).lower().replace(" ",""); od=v.get("odd")
+        try: od=float(od)
+        except: continue
+        if val in ("home/draw","1x"): d["1X"]=od
+        elif val in ("draw/away","x2"): d["X2"]=od
+        elif val in ("home/away","12"): d["12"]=od
+    return d if d else None
 def _parse_1x2(values):
     d={}
     for v in (values or []):
@@ -183,6 +194,11 @@ def _fetch_markets(fid, used):
                     k=WHICH_MARKETS[low]
                     if (k not in which) or (bname in ("Pinnacle","Bet365")):
                         row["book"]=bname; which[k]=row
+                elif low in DC_MARKETS:
+                    dcr=_parse_dc(bet.get("values"))
+                    if not dcr: continue
+                    if ("dc" not in which) or (bname in ("Pinnacle","Bet365")):
+                        dcr["book"]=bname; which["dc"]=dcr
     return (markets, which)
 
 def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=40):
