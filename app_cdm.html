@@ -790,6 +790,22 @@ function _reelRows(){
       var side=pe.exp>row.line?"over":"under";
       out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+row.line,book:mkt.book,odd:side==="over"?row.over:row.under,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga});
     });
+    // Over 0,5 but 1re MT (marche "Goals Over/Under First Half", ligne 0.5)
+    if(m.htgf!=null&&m.htga!=null){
+      var htTot=m.htgf+m.htga, shTot=(m.gf+m.ga)-htTot;
+      Object.keys(o.markets||{}).forEach(function(mkName){
+        if(!/first half/i.test(mkName)||!/over\/under/i.test(mkName))return;
+        var r05=_ouRowAt(o.markets[mkName],0.5); if(!r05)return;
+        var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);
+        if(!pg||!pg2||pg.n<5||pg2.n<5)return;
+        if(pg.exp+pg2.exp<2.2)return; // on ne conseille l'over MT1 que si le match promet des buts
+        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"Over 0,5 but 1re MT",book:o.markets[mkName].book,odd:r05[1],mini:1.25,won:htTot>0,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true});
+      });
+      // Mi-temps la plus riche en buts : on suit la tendance historique (2e MT), cote ~2.0
+      if(wh.hsh&&wh.hsh.second){
+        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"MT la plus riche : 2e",book:wh.hsh.book,odd:wh.hsh.second,mini:1.90,won:shTot>htTot,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true});
+      }
+    }
     // BTTS avec cotes reelles : Oui si les 2 attaques sont fortes, Non si l'exterieur marque peu
     if(wh.btts&&wh.btts.yes){
       var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);

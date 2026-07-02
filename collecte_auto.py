@@ -111,9 +111,11 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
         h=fx["teams"]["home"]["name"]; a=fx["teams"]["away"]["name"]
         if st in ("FT","AET","PEN"):  # FT + prolongation (AET) + tirs au but (PEN) = match termine
             if fid in matches: continue
+            _ht=(fx.get("score",{}) or {}).get("halftime",{}) or {}
             pending.append({"fid":fid,"date":fx["fixture"]["date"][:10],"dt":fx["fixture"]["date"],"h":h,"a":a,
                 "league":str(lid),"lname":lg.get("name",""),"season":lg.get("season",""),
-                "gh":fx.get("goals",{}).get("home") or 0,"ga":fx.get("goals",{}).get("away") or 0,"prio":prio})
+                "gh":fx.get("goals",{}).get("home") or 0,"ga":fx.get("goals",{}).get("away") or 0,
+                "hth":_ht.get("home"),"hta":_ht.get("away"),"prio":prio})
         elif st in ("NS","TBD"):
             upcoming_raw[fid]={"date":fx["fixture"]["date"][:10],"time":fx["fixture"]["date"],"h":h,"a":a,"lname":lg.get("name","")}
 
@@ -121,7 +123,8 @@ ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
     "goals over/under","corners over under","total - corners","total corners",
-    "cards over/under","total cards","total - cards"}
+    "cards over/under","total cards","total - cards",
+    "goals over/under first half","goals over/under - first half","first half goals over/under"}
 BTTS_MARKETS={"both teams score","both teams to score"}
 def _parse_btts(values):
     d={}
@@ -134,6 +137,17 @@ def _parse_btts(values):
     return d if ("yes" in d and "no" in d) else None
 # marches "quelle equipe tire le plus" (3 issues : domicile / nul / exterieur)
 WHICH_MARKETS={"shots.1x2":"shots","shotontarget 1x2":"sot","match winner":"mw"}
+HSH_MARKETS={"highest scoring half"}
+def _parse_hsh(values):
+    d={}
+    for v in (values or []):
+        val=str(v.get("value","")).lower(); od=v.get("odd")
+        try: od=float(od)
+        except: continue
+        if "1st" in val or "first" in val: d["first"]=od
+        elif "2nd" in val or "second" in val: d["second"]=od
+        elif "draw" in val or "equal" in val: d["draw"]=od
+    return d if ("first" in d and "second" in d) else None
 DC_MARKETS={"double chance"}
 def _parse_dc(values):
     d={}
@@ -215,6 +229,11 @@ def _fetch_markets(fid, used):
                     if not bt: continue
                     if ("btts" not in which) or (bname in ("Pinnacle","Bet365")):
                         bt["book"]=bname; which["btts"]=bt
+                elif low in HSH_MARKETS:
+                    hs=_parse_hsh(bet.get("values"))
+                    if not hs: continue
+                    if ("hsh" not in which) or (bname in ("Pinnacle","Bet365")):
+                        hs["book"]=bname; which["hsh"]=hs
     return (markets, which)
 
 def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=120):
@@ -289,6 +308,20 @@ def run():
             resp=api_get("/fixtures",{"id":fid},used)
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],None,True)
             time.sleep(SLEEP)
+        # one-time : recupere les scores mi-temps des matchs recents deja en base
+        if not progress.get("ht_backfill_v1"):
+            cutoff_ht=(datetime.date.today()-datetime.timedelta(days=21)).isoformat()
+            need=[fid for fid,m in matches.items() if m.get("hth") is None and m.get("date","")>=cutoff_ht]
+            done_all=True
+            for fid in need[:80]:
+                if not can_continue(used): done_all=False; break
+                resp=api_get("/fixtures",{"id":fid},used)
+                for fx in resp:
+                    _ht=(fx.get("score",{}) or {}).get("halftime",{}) or {}
+                    if _ht.get("home") is not None:
+                        matches[fid]["hth"]=_ht.get("home"); matches[fid]["hta"]=_ht.get("away")
+                time.sleep(SLEEP)
+            if done_all and len(need)<=80: progress["ht_backfill_v1"]=True
         # ===== PRIORITE 2 : COTES (rafraichies a CHAQUE passage, AVANT le backfill) =====
         recent_ft={}
         try:
@@ -323,6 +356,7 @@ def run():
                 per[blk["team"]["name"]]=dd
             matches[it["fid"]]={"date":it["date"],"dt":it.get("dt"),"lid":it["league"],"lname":it["lname"],"season":it["season"],
                 "h":it["h"],"a":it["a"],"gh":it["gh"],"ga":it["ga"],
+                "hth":it.get("hth"),"hta":it.get("hta"),
                 "H":parse_side(per.get(it["h"],{})),"A":parse_side(per.get(it["a"],{}))}
             time.sleep(SLEEP)
         # nettoie les matchs deja joues de la liste "a venir"
@@ -371,8 +405,8 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
     byteam={}; comps=set()
     for fid,m in matches.items():
         comps.add(m.get("lname",""))
-        r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]; r1["dt"]=m.get("dt")
-        r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]; r2["dt"]=m.get("dt")
+        r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]; r1["dt"]=m.get("dt"); r1["htgf"]=m.get("hth"); r1["htga"]=m.get("hta")
+        r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]; r2["dt"]=m.get("dt"); r2["htgf"]=m.get("hta"); r2["htga"]=m.get("hth")
         byteam.setdefault(m["h"],[]).append(r1)
         byteam.setdefault(m["a"],[]).append(r2)
     TEAMS={}
