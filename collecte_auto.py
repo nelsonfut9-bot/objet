@@ -11,7 +11,7 @@ import json, os, sys, time, math, datetime
 API_KEY  = os.environ.get("API_FOOTBALL_KEY", "")
 BASE_URL = "https://v3.football.api-sports.io"
 OUTPUT   = "donnees_cdm.js"; PROGRESS="progress.json"; MATCHES="matches.json"
-SAFETY_MARGIN=60; MAX_RUN=2000; MAX_PER_TEAM=100; SLEEP=0.10  # MAX_RUN volontairement bas : on sauvegarde souvent (checkpoints)
+SAFETY_MARGIN=60; MAX_RUN=2000; MAX_PER_TEAM=400; SLEEP=0.10  # MAX_RUN volontairement bas : on sauvegarde souvent (checkpoints)
 WC_LEAGUE=1; WC_SEASON=2026; PRIORITY_SEASONS=[2020,2021,2022,2023,2024,2025,2026]
 
 COMPETITIONS=[
@@ -34,16 +34,16 @@ COMPETITIONS=[
     (9,"Copa America","nation",[2021,2024]),
     (10,"Amicaux","nation",[2022,2023,2024,2025]),
     # championnats a saison calendaire, actifs en ete (ajout 07/2026)
-    (253,"MLS","club",[2023,2024,2025,2026]),
-    (71,"Brasileirao Serie A","club",[2023,2024,2025,2026]),
-    (128,"Liga Profesional Argentina","club",[2023,2024,2025,2026]),
-    (103,"Eliteserien","club",[2023,2024,2025,2026]),
-    (113,"Allsvenskan","club",[2023,2024,2025,2026]),
-    (244,"Veikkausliiga","club",[2023,2024,2025,2026]),
-    (98,"J1 League","club",[2023,2024,2025,2026]),
-    (292,"K League 1","club",[2023,2024,2025,2026]),
-    (357,"Premier Division Irlande","club",[2023,2024,2025,2026]),
-    (164,"Besta deild Islande","club",[2023,2024,2025,2026]),
+    (253,"MLS","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (71,"Brasileirao Serie A","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (128,"Liga Profesional Argentina","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (103,"Eliteserien","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (113,"Allsvenskan","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (244,"Veikkausliiga","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (98,"J1 League","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (292,"K League 1","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (357,"Premier Division Irlande","club",[2020,2021,2022,2023,2024,2025,2026]),
+    (164,"Besta deild Islande","club",[2020,2021,2022,2023,2024,2025,2026]),
 ]
 
 INT_STATS={"Total Shots":"ts","Shots on Goal":"sot","Shots off Goal":"sog","Shots insidebox":"sib","Shots outsidebox":"sob",
