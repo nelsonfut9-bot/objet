@@ -187,9 +187,10 @@
   <section id="reel" class="hidden">
     <div class="panel">
       <div class="secTitle" style="margin-top:0">Suivi réel — uniquement les vraies cotes captées</div>
-      <p class="small muted">Ici, zéro théorie : chaque ligne est un match dont la cote a été <b>réellement relevée</b> chez un bookmaker avant le match. Un pari est « Pris » seulement si la cote réelle atteignait la cote minimum de la règle ; sinon il est affiché « Non pris (cote trop basse) » et ne compte pas dans le gain. Mise '+'200'+' par pari pris. Les cotes 1X2 et double chance ne sont collectées que depuis début juillet 2026 — cette page se remplit au fil des matchs.</p>
+      <p class="small muted">Ici, zéro théorie : chaque ligne est un match dont la cote a été <b>réellement relevée</b> chez un bookmaker avant le match. Par défaut, <b>tout pari préconisé dont la cote a été trouvée est pris</b>, quelle que soit la cote. Le filtre « Cote mini » permet d'exclure les petites cotes (≥ 1,10, ≥ 1,31…) ou d'appliquer la cote mini propre à chaque règle — les paris exclus restent affichés mais ne comptent pas dans le gain. Mise '+'200'+' par pari pris. Les cotes 1X2 et double chance ne sont collectées que depuis début juillet 2026 — cette page se remplit au fil des matchs.</p>
       <div class="filterbar">
         <div class="field"><label>Type de pari</label><select id="rlType"><option value="all">Tous</option></select></div>
+        <div class="field" style="max-width:210px"><label>Cote mini</label><select id="rlMin"><option value="0">Toutes les cotes (tout pris)</option><option value="1.10">≥ 1,10</option><option value="1.20">≥ 1,20</option><option value="1.31">≥ 1,31</option><option value="1.50">≥ 1,50</option><option value="regle">Cote mini de chaque règle</option></select></div>
         <div class="field"><label>Équipe</label><select id="rlTeam"><option value="all">Toutes</option></select></div>
         <div class="field"><label>Championnat</label><select id="rlComp"><option value="all">Tous</option></select></div>
         <div class="field"><label>Saison</label><select id="rlSeason"><option value="all">Toutes</option></select></div>
@@ -810,14 +811,16 @@ function buildReel(){
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
   var stats={},pnl=0,nTaken=0,nWon=0,nSkip=0;
+  var minSel=$("rlMin")?$("rlMin").value:"0";
   rows.forEach(function(r){
-    r.taken=r.odd>=r.mini; r.gain=null;
+    var thr=(minSel==="regle")?r.mini:parseFloat(minSel||"0");
+    r.taken=r.odd>=thr; r.gain=null;
     if(r.taken){nTaken++;r.gain=r.won?Math.round((r.odd-1)*STAKE):-STAKE;if(r.won)nWon++;pnl+=r.gain;
       var s=stats[r.label]||(stats[r.label]={n:0,ok:0,pnl:0});s.n++;if(r.won)s.ok++;s.pnl+=r.gain;}
     else nSkip++;
   });
   body.innerHTML=rows.map(function(r){
-    var st=r.taken?'<span class="pill W">Pris</span>':'<span class="pill" style="background:#5b6b7d;color:#fff">Non pris (cote &lt; mini)</span>';
+    var st=r.taken?'<span class="pill W">Pris</span>':'<span class="pill" style="background:#5b6b7d;color:#fff">Non pris (sous le filtre)</span>';
     var res=r.won?'<span style="color:var(--good);font-weight:800">✓ Gagné</span>':'<span style="color:var(--bad);font-weight:800">✗ Perdu</span>';
     var g=r.gain==null?'—':('<span style="color:'+(r.gain>=0?'var(--good)':'var(--bad)')+';font-weight:700">'+(r.gain>=0?'+':'')+r.gain+'</span>');
     return '<tr><td class="small muted">'+dm(r.date)+'</td><td>'+fr(r.h)+' <span class="muted">vs</span> '+fr(r.a)+'</td><td>'+r.label+(r.detail?' <span class="muted small">'+r.detail+'</span>':'')+'</td><td class="small">'+esc(r.book||"?")+'</td><td class="num"><b>'+frn(r.odd)+'</b></td><td class="num small muted">'+frn(r.mini)+'</td><td>'+st+'</td><td class="num">'+r.score+'</td><td>'+res+'</td><td class="num">'+g+'</td></tr>';
@@ -829,7 +832,7 @@ function buildReel(){
     var s=stats[k];
     cards+='<div class="card g"><div class="v">'+Math.round(s.ok/s.n*100)+'%</div><div class="k">'+k+' — '+s.n+' pris · '+(s.pnl>=0?'+':'')+s.pnl+'</div></div>';
   });
-  cards+='<div class="card"><div class="v">'+nSkip+'</div><div class="k">Écartés : cote réelle sous la cote mini</div></div>';
+  cards+='<div class="card"><div class="v">'+nSkip+'</div><div class="k">Écartés par le filtre cote mini</div></div>';
   $("rlCards").innerHTML=cards;
 }
 // ---- Suivi : backtest des Paris du jour (memes regles, zero lookahead) ----
@@ -1202,8 +1205,8 @@ window.addEventListener("DOMContentLoaded",function(){
   $("bkReset").addEventListener("click",function(){$("bkFrom").value="";$("bkTo").value="";buildBankroll();});
   $("bkExport").addEventListener("click",exportBankrollCSV);
   $("vbScope").addEventListener("change",buildValueBets);
-  ["rlType","rlTeam","rlComp","rlSeason","rlFrom","rlTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildReel);});
-  if($("rlReset"))$("rlReset").addEventListener("click",function(){["rlType","rlTeam","rlComp","rlSeason"].forEach(function(id){$(id).value="all";});$("rlFrom").value="";$("rlTo").value="";buildReel();});
+  ["rlType","rlMin","rlTeam","rlComp","rlSeason","rlFrom","rlTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildReel);});
+  if($("rlReset"))$("rlReset").addEventListener("click",function(){["rlType","rlTeam","rlComp","rlSeason"].forEach(function(id){$(id).value="all";});$("rlMin").value="0";$("rlFrom").value="";$("rlTo").value="";buildReel();});
   document.querySelectorAll(".tabs .tab").forEach(function(t){t.addEventListener("click",function(){if(t.dataset.tab)selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});
