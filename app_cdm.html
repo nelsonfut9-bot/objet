@@ -99,6 +99,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="equipes">Équipes</div>
     <div class="tab" data-tab="avenir">Matchs à venir</div>
+    <div class="tab" data-tab="picks">Paris du jour</div>
     <div class="tab" data-tab="value">Value bets</div>
     <div class="tab" data-tab="analyse">Analyse d'un match</div>
     <div class="tab" data-tab="suivi">Suivi & fiabilité</div>
@@ -123,6 +124,15 @@
       <div class="secTitle" style="margin-top:0">Prochains matchs</div>
       <p class="small muted">Cliquez un match pour l'analyser. La liste se remplit au fil de la collecte automatique.</p>
       <table id="up"><thead><tr><th>Date</th><th>Match</th><th>Compétition</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <section id="picks" class="hidden">
+    <div class="panel">
+      <div class="secTitle" style="margin-top:0">Paris du jour — règle « double chance favori net »</div>
+      <p class="small muted">Règle validée par backtest sur tout l'historique de la base : quand le modèle donne un favori net (écart d'au moins 1 but attendu), la <b>double chance</b> sur le favori a historiquement réussi <b>80&nbsp;%</b> du temps à domicile (n=2&nbsp;086) et <b>77&nbsp;%</b> à l'extérieur (n=644) — chiffres vérifiables dans « Suivi &amp; fiabilité », filtre « Paris du jour ». Chaque ligne indique la <b>cote minimum rentable</b> : si la cote affichée chez ton bookmaker est <b>inférieure</b>, le pari perd de l'argent sur le long terme — ne le prends pas.</p>
+      <table id="pk"><thead><tr><th>Date</th><th>Match</th><th>Compétition</th><th>Pari</th><th class="num">Réussite hist.</th><th class="num">Cote mini</th><th class="num">Écart modèle</th></tr></thead><tbody id="pkBody"></tbody></table>
+      <p class="small muted" style="margin-top:10px">« Cote mini » inclut une petite marge de sécurité. Les paris secondaires (Over 1,5 but, 80&nbsp;% historique) apparaissent quand le modèle attend au moins 3 buts. Moyennes historiques ≠ garantie : gérer la mise en conséquence.</p>
     </div>
   </section>
 
@@ -155,7 +165,7 @@
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
       <p class="small muted">Backtest 100% honnête : pour chaque match, l'estimation n'utilise QUE les matchs joués AVANT cette date — jamais le match lui-même, jamais les matchs postérieurs. Comme si je n'avais pas vu le résultat. Cliquez une ligne pour voir le détail et la prédiction d'avant-match.</p>
       <div class="filterbar">
-        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="xg">Buts attendus (xG)</option></select></div>
+        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="picks">Paris du jour (double chance, victoire, over 1,5)</option><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="xg">Buts attendus (xG)</option></select></div>
         <div class="field"><label>Portée</label><select id="btScope"><option value="all">Tout (équipes + match)</option><option value="teams">Par équipe (A &amp; B)</option><option value="match">Match (total) seulement</option></select></div>
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
@@ -636,6 +646,7 @@ function btCell(rc,real){
 function buildBacktest(){
   var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value, scope=$("btScope").value;
   var fFrom=$("btFrom").value, fTo=$("btTo").value;
+  if(metric==="picks"){buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo);return;}
   var UNIT={ts:"tirs",sot:"tirs cadrés",cor:"corners",xg:"buts attendus (xG)"};
   var unit=UNIT[metric]||"tirs";
   var showA=scope!=="match", showB=scope!=="match", showM=scope!=="teams";
@@ -724,7 +735,91 @@ function buildUpcoming(){
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
 function loadMatch(h,a){if(TEAMS[h])$("home").value=h;if(TEAMS[a])$("away").value=a;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","value","analyse","suivi","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","value","analyse","suivi","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+
+// ---- Suivi : backtest des Paris du jour (memes regles, zero lookahead) ----
+function pickRulesFor(home,away,date){
+  var ph=predKeyAt(home,away,true,date,"gf","ga",1.4,1.12,0.95);
+  var pa=predKeyAt(away,home,false,date,"gf","ga",1.4,1.12,0.95);
+  if(!ph||!pa||ph.n<5||pa.n<5)return null;
+  var eh=ph.exp, ea=pa.exp, gap=eh-ea, eg=eh+ea, out=[];
+  if(gap>=1.0)out.push({code:"1X",label:"Double chance 1X",hit:"80 %",mini:"1.31",gap:gap});
+  if(-gap>=1.0)out.push({code:"X2",label:"Double chance X2",hit:"77 %",mini:"1.36",gap:gap});
+  if(gap>=1.3)out.push({code:"V1",label:"Victoire domicile",hit:"67 %",mini:"1.57",gap:gap});
+  if(eg>=3.0)out.push({code:"O15",label:"Over 1,5 but",hit:"80 %",mini:"1.31",gap:gap});
+  return out.length?out:null;
+}
+function pickWon(code,gf,ga){
+  if(code==="1X")return gf>=ga;
+  if(code==="X2")return ga>=gf;
+  if(code==="V1")return gf>ga;
+  if(code==="O15")return (gf+ga)>=2;
+  return null;
+}
+function buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo){
+  var rows=[],stats={};
+  Object.keys(TEAMS).forEach(function(n){
+    if(fTeam&&fTeam!=="all"&&n!==fTeam)return;
+    TEAMS[n].matches.forEach(function(m){
+      if(!m.home||m.gf==null||m.ga==null)return;
+      if(fComp&&fComp!=="all"&&m.comp!==fComp)return;
+      if(fSeason&&fSeason!=="all"&&String(m.season)!==String(fSeason))return;
+      if(fFrom&&m.date<fFrom)return;
+      if(fTo&&m.date>fTo)return;
+      var picks=pickRulesFor(n,m.opp,m.date); if(!picks)return;
+      picks.forEach(function(p){
+        var won=pickWon(p.code,m.gf,m.ga);
+        var s=stats[p.label]||(stats[p.label]={n:0,ok:0}); s.n++; if(won)s.ok++;
+        rows.push({date:m.date,dt:m.dt,name:n,opp:m.opp,label:p.label,hit:p.hit,mini:p.mini,gap:p.gap,score:m.gf+" - "+m.ga,won:won});
+      });
+    });
+  });
+  rows.sort(function(a,b){return a.date<b.date?1:-1;});
+  var shown=rows.slice(0,120);
+  document.querySelector("#bt thead").innerHTML='<tr><th>Date</th><th>Match (A – B)</th><th>Pari</th><th class="num">Écart modèle</th><th class="num">Score</th><th>Résultat</th></tr>';
+  document.querySelector("#bt tbody").innerHTML=shown.map(function(r){
+    var badge=r.won?'<span style="color:var(--good);font-weight:800">✓ Gagné</span>':'<span style="color:var(--bad);font-weight:800">✗ Perdu</span>';
+    return '<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+timeTag(r.dt)+'</td><td>'+fr(r.name)+' <span class="muted">–</span> '+fr(r.opp)+'</td><td>'+r.label+'</td><td class="num">'+(r.gap>=0?"+":"")+r.gap.toFixed(1)+'</td><td class="num">'+r.score+'</td><td>'+badge+'</td></tr>';
+  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Aucun pari du jour déclenché pour ce filtre.</td></tr>';
+  var cards='';
+  Object.keys(stats).forEach(function(k){
+    var s=stats[k];
+    cards+='<div class="card g"><div class="v">'+Math.round(s.ok/s.n*100)+'%</div><div class="k">'+k+' ('+s.n+' paris)</div></div>';
+  });
+  var totN=0,totOk=0;Object.keys(stats).forEach(function(k){totN+=stats[k].n;totOk+=stats[k].ok;});
+  cards+='<div class="card"><div class="v">'+totN+'</div><div class="k">Paris testés (tout l\'historique filtré)</div></div>';
+  $("scoreCards").innerHTML=cards;
+  document.querySelectorAll("#bt tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(tr.dataset.n,tr.dataset.d,tr.dataset.o);});});
+}
+
+// ---- Paris du jour : double chance favori net (backtest 15 544 matchs) ----
+function buildPicks(){
+  var body=$("pkBody"); if(!body)return;
+  var seen={},list=[];
+  Object.keys(TEAMS).forEach(function(n){(TEAMS[n].upcoming||[]).forEach(function(u){
+    var home=u.home?n:u.opp, away=u.home?u.opp:n, key=u.date+"|"+home+"|"+away;
+    if(seen[key])return; seen[key]=1; list.push({date:u.date,time:u.time,home:home,away:away,comp:u.comp});
+  });});
+  list.sort(function(a,b){return a.date<b.date?-1:1;});
+  var rows=[];
+  list.slice(0,150).forEach(function(m){
+    if(!TEAMS[m.home]||!TEAMS[m.away])return;
+    var ph=predKeyAt(m.home,m.away,true,m.date,"gf","ga",1.4,1.12,0.95);
+    var pa=predKeyAt(m.away,m.home,false,m.date,"gf","ga",1.4,1.12,0.95);
+    if(!ph||!pa||ph.n<5||pa.n<5)return;
+    var eh=ph.exp, ea=pa.exp, gap=eh-ea, eg=eh+ea;
+    var picks=[];
+    if(gap>=1.0)picks.push({label:"Double chance 1X ("+fr(m.home)+" ou nul)",hit:"80 %",mini:"1.31",gap:gap});
+    if(-gap>=1.0)picks.push({label:"Double chance X2 ("+fr(m.away)+" ou nul)",hit:"77 %",mini:"1.36",gap:gap});
+    if(gap>=1.3)picks.push({label:"Victoire "+fr(m.home),hit:"67 %",mini:"1.57",gap:gap});
+    if(eg>=3.0)picks.push({label:"Over 1,5 but (match)",hit:"80 %",mini:"1.31",gap:gap});
+    picks.forEach(function(p){
+      rows.push('<tr class="click" data-h="'+esc(m.home)+'" data-a="'+esc(m.away)+'"><td class="small muted">'+dm(m.date)+'</td><td>'+fr(m.home)+' <span class="muted">vs</span> '+fr(m.away)+'</td><td class="compTag">'+(m.comp||"")+'</td><td>'+p.label+'</td><td class="num">'+p.hit+'</td><td class="num"><b>&ge; '+p.mini+'</b></td><td class="num">'+(p.gap>=0?"+":"")+p.gap.toFixed(1)+' but</td></tr>');
+    });
+  });
+  body.innerHTML=rows.join("")||'<tr><td colspan="7" class="muted" style="text-align:center;padding:18px">Aucun match à venir ne déclenche la règle pour l\'instant (il faut un favori net avec au moins 5 matchs d\'historique par équipe).</td></tr>';
+  document.querySelectorAll("#pk tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
+}
 
 // ---- bankroll (mise fixe, vraies cotes uniquement) ----
 var STAKE=200;
@@ -1000,7 +1095,7 @@ window.addEventListener("DOMContentLoaded",function(){
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
   calibrateModel();
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
   if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
   $("q").addEventListener("input",renderTeamList);
   $("fcat").addEventListener("change",function(){populateTeamFilters();renderTeamList();});
