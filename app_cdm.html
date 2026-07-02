@@ -774,16 +774,31 @@ function _reelRows(){
       else if(p.code==="V1"&&wh.mw&&wh.mw.home){odd=wh.mw.home;book=wh.mw.book;}
       else if(p.code==="O15"){var g=o.markets&&o.markets["Goals Over/Under"];var r=_ouRowAt(g,1.5);if(r){odd=r[1];book=g.book;}}
       if(odd==null)return;
-      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:p.label,book:book,odd:odd,mini:p.odd,won:pickWon(p.code,m.gf,m.ga),score:m.gf+" - "+m.ga});
+      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:p.label,book:book,odd:odd,mini:p.odd,won:pickWon(p.code,m.gf,m.ga),score:m.gf+" - "+m.ga,isPick:true});
     });
-    [["Total Shots","ts","Total tirs"],["Total ShotOnGoal","sot","Total tirs cadrés"]].forEach(function(mk){
-      var mkt=o.markets&&o.markets[mk[0]]; if(!mkt||!mkt.rows||!mkt.rows.length)return;
-      var pe=marketPre(mk[0],o.h,o.a,o.date); if(!pe)return;
+    Object.keys(o.markets||{}).forEach(function(mkName){
+      var label=null;
+      if(mkName==="Total Shots")label="Total tirs";
+      else if(mkName==="Total ShotOnGoal")label="Total tirs cadrés";
+      else if(/corner/i.test(mkName))label="Total corners";
+      else if(/card/i.test(mkName))label="Total cartons";
+      if(!label)return;
+      var mkt=o.markets[mkName]; if(!mkt||!mkt.rows||!mkt.rows.length)return;
+      var pe=marketPre(mkName,o.h,o.a,o.date); if(!pe)return;
       var row=oddsRowFor(mkt); if(!row)return;
-      var real=realMarket(mk[0],m); if(real==null||real<=0)return;
+      var real=realMarket(mkName,m); if(real==null||real<=0)return;
       var side=pe.exp>row.line?"over":"under";
-      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:mk[2],detail:(side==="over"?"Over ":"Under ")+row.line,book:mkt.book,odd:side==="over"?row.over:row.under,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga});
+      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+row.line,book:mkt.book,odd:side==="over"?row.over:row.under,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga});
     });
+    // BTTS avec cotes reelles : Oui si les 2 attaques sont fortes, Non si l'exterieur marque peu
+    if(wh.btts&&wh.btts.yes){
+      var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);
+      if(pg&&pg2&&pg.n>=5&&pg2.n>=5){
+        var bothScored=(m.gf>0&&m.ga>0);
+        if(pg.exp>=1.2&&pg2.exp>=1.2)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Oui",book:wh.btts.book,odd:wh.btts.yes,mini:1.55,won:bothScored,score:m.gf+" - "+m.ga});
+        else if(pg2.exp<=0.7)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Non",book:wh.btts.book,odd:wh.btts.no,mini:1.55,won:!bothScored,score:m.gf+" - "+m.ga});
+      }
+    }
   });
   return out;
 }
@@ -793,7 +808,11 @@ function fillReelFilters(rows){
   function fill(id,obj,lbl){var el=$(id);if(!el)return;var cur=el.value||"all";
     el.innerHTML='<option value="all">'+lbl+'</option>'+Object.keys(obj).sort().map(function(k){return '<option value="'+esc(k)+'">'+(id==="rlTeam"?fr(k):k)+'</option>';}).join("");
     el.value=cur; if(el.value!==cur)el.value="all";}
-  fill("rlType",types,"Tous"); fill("rlTeam",teams,"Toutes"); fill("rlComp",comps,"Tous"); fill("rlSeason",seasons,"Toutes");
+  var elT=$("rlType");
+  if(elT){var curT=elT.value||"all";
+    elT.innerHTML='<option value="all">Tous</option><option value="__picks">Paris du jour (groupés)</option>'+Object.keys(types).sort().map(function(k){return '<option value="'+esc(k)+'">'+k+'</option>';}).join("");
+    elT.value=curT; if(elT.value!==curT)elT.value="all";}
+  fill("rlTeam",teams,"Toutes"); fill("rlComp",comps,"Tous"); fill("rlSeason",seasons,"Toutes");
 }
 function buildReel(){
   var body=$("rlBody"); if(!body)return;
@@ -801,7 +820,8 @@ function buildReel(){
   fillReelFilters(all);
   var fT=$("rlType").value,fE=$("rlTeam").value,fC=$("rlComp").value,fS=$("rlSeason").value,fFrom=$("rlFrom").value,fTo=$("rlTo").value;
   var rows=all.filter(function(r){
-    if(fT&&fT!=="all"&&r.label!==fT)return false;
+    if(fT==="__picks"){if(!r.isPick)return false;}
+    else if(fT&&fT!=="all"&&r.label!==fT)return false;
     if(fE&&fE!=="all"&&r.h!==fE&&r.a!==fE)return false;
     if(fC&&fC!=="all"&&r.comp!==fC)return false;
     if(fS&&fS!=="all"&&String(r.season)!==String(fS))return false;
@@ -828,9 +848,11 @@ function buildReel(){
   var cards='';
   cards+='<div class="card'+(pnl>=0?' g':'')+'"><div class="v" style="color:'+(pnl>=0?'var(--good)':'var(--bad)')+'">'+(pnl>=0?'+':'')+pnl+'</div><div class="k">Gain net réel (mise '+STAKE+'/pari pris)</div></div>';
   cards+='<div class="card g"><div class="v">'+(nTaken?Math.round(nWon/nTaken*100)+"%":"—")+'</div><div class="k">Réussite des paris pris ('+nWon+'/'+nTaken+')</div></div>';
+  var roiG=nTaken?Math.round(pnl/(nTaken*STAKE)*100):0;
+  cards+='<div class="card'+(roiG>=0?' g':'')+'"><div class="v" style="color:'+(roiG>=0?'var(--good)':'var(--bad)')+'">'+(roiG>=0?'+':'')+roiG+'%</div><div class="k">ROI (gain net / total misé)</div></div>';
   Object.keys(stats).forEach(function(k){
-    var s=stats[k];
-    cards+='<div class="card g"><div class="v">'+Math.round(s.ok/s.n*100)+'%</div><div class="k">'+k+' — '+s.n+' pris · '+(s.pnl>=0?'+':'')+s.pnl+'</div></div>';
+    var s=stats[k],roi=Math.round(s.pnl/(s.n*STAKE)*100);
+    cards+='<div class="card g"><div class="v">'+Math.round(s.ok/s.n*100)+'%</div><div class="k">'+k+' — '+s.n+' pris · '+(s.pnl>=0?'+':'')+s.pnl+' · ROI '+(roi>=0?'+':'')+roi+'%</div></div>';
   });
   cards+='<div class="card"><div class="v">'+nSkip+'</div><div class="k">Écartés par le filtre cote mini</div></div>';
   $("rlCards").innerHTML=cards;

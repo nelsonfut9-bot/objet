@@ -120,7 +120,18 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
 ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
-    "goals over/under"}
+    "goals over/under","corners over under","total - corners","total corners",
+    "cards over/under","total cards","total - cards"}
+BTTS_MARKETS={"both teams score","both teams to score"}
+def _parse_btts(values):
+    d={}
+    for v in (values or []):
+        val=str(v.get("value","")).lower().strip(); od=v.get("odd")
+        try: od=float(od)
+        except: continue
+        if val in ("yes","oui"): d["yes"]=od
+        elif val in ("no","non"): d["no"]=od
+    return d if ("yes" in d and "no" in d) else None
 # marches "quelle equipe tire le plus" (3 issues : domicile / nul / exterieur)
 WHICH_MARKETS={"shots.1x2":"shots","shotontarget 1x2":"sot","match winner":"mw"}
 DC_MARKETS={"double chance"}
@@ -199,6 +210,11 @@ def _fetch_markets(fid, used):
                     if not dcr: continue
                     if ("dc" not in which) or (bname in ("Pinnacle","Bet365")):
                         dcr["book"]=bname; which["dc"]=dcr
+                elif low in BTTS_MARKETS:
+                    bt=_parse_btts(bet.get("values"))
+                    if not bt: continue
+                    if ("btts" not in which) or (bname in ("Pinnacle","Bet365")):
+                        bt["book"]=bname; which["btts"]=bt
     return (markets, which)
 
 def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=120):
