@@ -681,22 +681,24 @@ function buildBacktest(){
   if(showM)th+='<th>Match total ('+lblMetric+')</th>';
   th+='</tr>';
   document.querySelector("#bt thead").innerHTML=th;
-  var okA=0,nA=0,okB=0,nB=0,okM=0,nM=0;
+  var okA=0,nA=0,okB=0,nB=0,okM=0,nM=0;var pA=0,pB=0,pM=0,ODD=1.85;
   var body=rows.map(function(r){
     var tr='<tr class="click" data-d="'+r.date+'" data-n="'+esc(r.name)+'" data-o="'+esc(r.opp)+'"><td class="small muted">'+dm(r.date)+timeTag(r.dt)+'</td><td>'+fr(r.name)+' <span class="muted">–</span> '+fr(r.opp)+'</td>';
-    if(showA){tr+=btCell(r.rcH,r.realH);var ja=judge(r.realH,r.rcH);if(ja!=null){nA++;okA+=ja;}}
-    if(showB){tr+=btCell(r.rcA,r.realA);var jb=judge(r.realA,r.rcA);if(jb!=null){nB++;okB+=jb;}}
-    if(showM){tr+=btCell(r.rcM,r.realM);var jm=judge(r.realM,r.rcM);if(jm!=null){nM++;okM+=jm;}}
+    if(showA){tr+=btCell(r.rcH,r.realH);var ja=judge(r.realH,r.rcH);if(ja!=null){nA++;okA+=ja;pA+=ja?Math.round((ODD-1)*STAKE):-STAKE;}}
+    if(showB){tr+=btCell(r.rcA,r.realA);var jb=judge(r.realA,r.rcA);if(jb!=null){nB++;okB+=jb;pB+=jb?Math.round((ODD-1)*STAKE):-STAKE;}}
+    if(showM){tr+=btCell(r.rcM,r.realM);var jm=judge(r.realM,r.rcM);if(jm!=null){nM++;okM+=jm;pM+=jm?Math.round((ODD-1)*STAKE):-STAKE;}}
     return tr+'</tr>';
   }).join("");
   var colspan=2+(showA?1:0)+(showB?1:0)+(showM?1:0);
   document.querySelector("#bt tbody").innerHTML=body||'<tr><td colspan="'+colspan+'" class="muted" style="text-align:center;padding:18px">Pas encore assez de données pour ce filtre.</td></tr>';
   function pct(ok,n){return n?Math.round(ok/n*100)+"%":"—";}
   var cards='';
-  if(showA)cards+='<div class="card g"><div class="v">'+pct(okA,nA)+'</div><div class="k">Équipe A correct ('+unit+', '+nA+')</div></div>';
-  if(showB)cards+='<div class="card g"><div class="v">'+pct(okB,nB)+'</div><div class="k">Équipe B correct ('+unit+', '+nB+')</div></div>';
-  if(showM)cards+='<div class="card g"><div class="v">'+pct(okM,nM)+'</div><div class="k">Match total correct ('+unit+', '+nM+')</div></div>';
-  cards+='<div class="card"><div class="v">'+rows.length+'</div><div class="k">Matchs testés</div></div>';
+  function pl(p,n){if(!n)return"";var roi=Math.round(p/(n*STAKE)*100);return ' · '+(p>=0?'+':'')+p+' ('+(roi>=0?'+':'')+roi+'%)';}
+  if(showA)cards+='<div class="card g"><div class="v">'+pct(okA,nA)+'</div><div class="k">Équipe A ('+unit+', '+nA+' paris)'+pl(pA,nA)+'</div></div>';
+  if(showB)cards+='<div class="card g"><div class="v">'+pct(okB,nB)+'</div><div class="k">Équipe B ('+unit+', '+nB+' paris)'+pl(pB,nB)+'</div></div>';
+  if(showM)cards+='<div class="card g"><div class="v">'+pct(okM,nM)+'</div><div class="k">Match total ('+unit+', '+nM+' paris)'+pl(pM,nM)+'</div></div>';
+  var totP=(showA?pA:0)+(showB?pB:0)+(showM?pM:0),totNN=(showA?nA:0)+(showB?nB:0)+(showM?nM:0);
+  cards+='<div class="card'+(totP>=0?' g':'')+'"><div class="v" style="color:'+(totP>=0?'var(--good)':'var(--bad)')+'">'+(totP>=0?'+':'')+totP+'</div><div class="k">Gain net — '+totNN+' paris, mise '+STAKE+', hypothèse cote 1.85 à la ligne du modèle (les lignes réelles des books peuvent différer)</div></div>';
   $("scoreCards").innerHTML=cards;
   document.querySelectorAll("#bt tr.click").forEach(function(tr){tr.addEventListener("click",function(){openMatch(tr.dataset.n,tr.dataset.d,tr.dataset.o);});});
 }
