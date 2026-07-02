@@ -201,7 +201,7 @@ def _fetch_markets(fid, used):
                         dcr["book"]=bname; which["dc"]=dcr
     return (markets, which)
 
-def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=40):
+def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=120):
     """Cotes des matchs a venir (rafraichies a chaque run pour approcher les cotes de cloture)
     + cotes des matchs recents joues, captees une seule fois (seed historique de la bankroll).
     Les matchs de Coupe du Monde sont traites en priorite."""
@@ -276,7 +276,7 @@ def run():
         # ===== PRIORITE 2 : COTES (rafraichies a CHAQUE passage, AVANT le backfill) =====
         recent_ft={}
         try:
-            cutoff=(datetime.date.today()-datetime.timedelta(days=12)).isoformat()
+            cutoff=(datetime.date.today()-datetime.timedelta(days=14)).isoformat()
             cutoff_wc=(datetime.date.today()-datetime.timedelta(days=90)).isoformat()
         except:
             cutoff="0000-00-00"; cutoff_wc="0000-00-00"
