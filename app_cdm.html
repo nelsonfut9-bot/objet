@@ -187,7 +187,7 @@
   <section id="reel" class="hidden">
     <div class="panel">
       <div class="secTitle" style="margin-top:0">Suivi réel — uniquement les vraies cotes captées</div>
-      <p class="small muted">Ici, zéro théorie : chaque ligne est un match dont la cote a été <b>réellement relevée</b> chez un bookmaker avant le match. Par défaut, <b>tout pari préconisé dont la cote a été trouvée est pris</b>, quelle que soit la cote. Le filtre « Cote mini » permet d'exclure les petites cotes (≥ 1,10, ≥ 1,31…) ou d'appliquer la cote mini propre à chaque règle — les paris exclus restent affichés mais ne comptent pas dans le gain. Mise '+'200'+' par pari pris. Les cotes 1X2 et double chance ne sont collectées que depuis début juillet 2026 — cette page se remplit au fil des matchs.</p>
+      <p class="small muted">Ici, zéro théorie : chaque ligne est un match dont la cote a été <b>réellement relevée</b> chez un bookmaker avant le match. Par défaut, <b>tout pari préconisé dont la cote a été trouvée est pris</b>, quelle que soit la cote. Le filtre « Cote mini » permet d'exclure les petites cotes (≥ 1,10, ≥ 1,31…) ou d'appliquer la cote mini propre à chaque règle — les paris exclus restent affichés mais ne comptent pas dans le gain. Mise '+'200'+' par pari pris. En plus des cotes captées en direct depuis juillet 2026, la page intègre les <b>cotes de clôture historiques</b> (football-data.co.uk, Bet365) des 5 grands championnats depuis 2020 : buts, victoire et double chance (dérivée du 1X2 réel).</p>
       <div class="filterbar">
         <div class="field"><label>Type de pari</label><select id="rlType"><option value="all">Tous</option></select></div>
         <div class="field" style="max-width:210px"><label>Cote mini</label><select id="rlMin"><option value="0">Toutes les cotes (tout pris)</option><option value="1.10">≥ 1,10</option><option value="1.20">≥ 1,20</option><option value="1.31">≥ 1,31</option><option value="1.50">≥ 1,50</option><option value="regle">Cote mini de chaque règle</option></select></div>
@@ -229,6 +229,7 @@
 <div id="modal" class="modal hidden"></div>
 
 <script src="donnees_cdm.js"></script>
+<script src="donnees_histo.js"></script>
 <script>
 var NAMES_FR={"Spain":"Espagne","Germany":"Allemagne","England":"Angleterre","France":"France","Brazil":"Brésil",
 "Argentina":"Argentine","Portugal":"Portugal","Netherlands":"Pays-Bas","Belgium":"Belgique","Croatia":"Croatie",
@@ -816,6 +817,34 @@ function _reelRows(){
       }
     }
   });
+  // cotes historiques reelles (football-data.co.uk) : buts / 1X2 / double chance derivee
+  if(typeof HISTO!=="undefined"&&HISTO&&HISTO.length){
+    HISTO.forEach(function(r){
+      if(!TEAMS[r.h]||!TEAMS[r.a]||r.fthg==null||r.ftag==null)return;
+      var comp=r.comp+" (histo)";
+      var pks=pickRulesFor(r.h,r.a,r.d)||[];
+      pks.forEach(function(p){
+        var odd=null,book=null;
+        if(p.code==="1X"&&r.h1&&r.x){odd=Math.round(100/(1/r.h1+1/r.x))/100;book="Bet365 (dérivée 1X2)";}
+        else if(p.code==="X2"&&r.x&&r.a2){odd=Math.round(100/(1/r.x+1/r.a2))/100;book="Bet365 (dérivée 1X2)";}
+        else if(p.code==="V1"&&r.h1){odd=r.h1;book="Bet365";}
+        if(odd==null)return;
+        var won=null;
+        if(p.code==="1X")won=r.fthg>=r.ftag;
+        else if(p.code==="X2")won=r.ftag>=r.fthg;
+        else if(p.code==="V1")won=r.fthg>r.ftag;
+        if(won==null)return;
+        out.push({date:r.d,h:r.h,a:r.a,comp:comp,season:r.season,label:p.label,book:book,odd:odd,mini:p.odd,won:won,score:r.fthg+" - "+r.ftag,isPick:true});
+      });
+      // Over 2,5 buts quand le modele attend >= 3.2 buts (cote de cloture reelle)
+      if(r.o25){
+        var pg=predKeyAt(r.h,r.a,true,r.d,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(r.a,r.h,false,r.d,"gf","ga",1.4,1.12,0.95);
+        if(pg&&pg2&&pg.n>=5&&pg2.n>=5&&pg.exp+pg2.exp>=3.2){
+          out.push({date:r.d,h:r.h,a:r.a,comp:comp,season:r.season,label:"Over 2,5 buts",book:"Bet365",odd:r.o25,mini:1.55,won:(r.fthg+r.ftag)>=3,score:r.fthg+" - "+r.ftag,isPick:true});
+        }
+      }
+    });
+  }
   return out;
 }
 function fillReelFilters(rows){
