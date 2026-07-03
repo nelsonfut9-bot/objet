@@ -168,6 +168,7 @@
       <div class="filterbar">
         <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="picks">Paris du jour (double chance, victoire, over 1,5)</option><option value="sot">Tirs cadrés</option><option value="xg">Buts attendus (xG)</option></select></div>
         <div class="field"><label>Portée</label><select id="btScope"><option value="all">Tout (équipes + match)</option><option value="teams">Par équipe (A &amp; B)</option><option value="match">Match (total) seulement</option></select></div>
+        <div class="field" style="max-width:150px"><label>Confiance</label><select id="btConf"><option value="all">Toutes</option><option value="elevee">Élevée</option><option value="moderee">Modérée</option><option value="faible">Faible</option></select></div>
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
         <div class="field"><label>Saison</label><select id="btSeason"></select></div>
@@ -190,6 +191,7 @@
       <p class="small muted">Ici, zéro théorie : chaque ligne est un match dont la cote a été <b>réellement relevée</b> chez un bookmaker avant le match. Par défaut, <b>tout pari préconisé dont la cote a été trouvée est pris</b>, quelle que soit la cote. Le filtre « Cote mini » permet d'exclure les petites cotes (≥ 1,10, ≥ 1,31…) ou d'appliquer la cote mini propre à chaque règle — les paris exclus restent affichés mais ne comptent pas dans le gain. Mise '+'200'+' par pari pris. En plus des cotes captées en direct depuis juillet 2026, la page intègre les <b>cotes de clôture historiques</b> (football-data.co.uk, Bet365) des 5 grands championnats depuis 2020 : buts, victoire et double chance (dérivée du 1X2 réel).</p>
       <div class="filterbar">
         <div class="field"><label>Type de pari</label><select id="rlType"><option value="all">Tous</option></select></div>
+        <div class="field" style="max-width:150px"><label>Confiance</label><select id="rlConf"><option value="all">Toutes</option><option value="elevee">Élevée</option><option value="moderee">Modérée</option><option value="faible">Faible</option></select></div>
         <div class="field" style="max-width:210px"><label>Cote mini</label><select id="rlMin"><option value="0">Toutes les cotes (tout pris)</option><option value="1.10">≥ 1,10</option><option value="1.20">≥ 1,20</option><option value="1.31">≥ 1,31</option><option value="1.50">≥ 1,50</option><option value="regle">Cote mini de chaque règle</option></select></div>
         <div class="field"><label>Équipe</label><select id="rlTeam"><option value="all">Toutes</option></select></div>
         <div class="field"><label>Championnat</label><select id="rlComp"><option value="all">Tous</option></select></div>
@@ -214,6 +216,7 @@
         <div class="field"><label>Statut</label><select id="bkStatus"><option value="all">Tous</option><option value="settled">Réglés</option><option value="pending">En attente</option></select></div>
         <div class="field" style="max-width:160px"><label>Du</label><input type="date" id="bkFrom"></div>
         <div class="field" style="max-width:160px"><label>Au</label><input type="date" id="bkTo"></div>
+        <div class="field" style="max-width:150px"><label>Confiance</label><select id="bkConf"><option value="all">Toutes</option><option value="elevee">Élevée</option><option value="moderee">Modérée</option><option value="faible">Faible</option></select></div>
         <div class="field" style="max-width:110px;display:flex;align-items:flex-end"><button class="tab" id="bkReset" style="width:100%">↺ Tout</button></div>
         <div class="field" style="display:flex;align-items:flex-end"><button class="tab" id="bkExport" style="background:var(--accent2);color:#04223f;border-color:var(--accent2);width:100%">⬇ Exporter en CSV</button></div>
       </div>
@@ -657,6 +660,9 @@ function realSide(m,metric,side){
 // conseil OVER/UNDER pour le total du match (somme des deux équipes)
 function recoTotal(eH,sdH,eA,sdA){var mu=eH+eA,sd=Math.sqrt(sdH*sdH+sdA*sdA);return {mu:mu,sd:sd,rc:reco(mu,sd)};}
 // 1 si le pari est gagné, 0 si perdu, null si non calculable
+// niveau de confiance uniforme : elevee / moderee / faible
+function confTier(p){if(p==null)return "moderee";if(p>1)p=p/100;return p>=0.72?"elevee":(p>=0.62?"moderee":"faible");}
+var CONF_OPTS='<option value="all">Toutes</option><option value="elevee">Élevée</option><option value="moderee">Modérée</option><option value="faible">Faible</option>';
 function judge(real,rc){if(rc==null||real==null)return null;var ao=real>rc.line;return (rc.side==="over")===ao?1:0;}
 // cellule "conseil → réel ✓/✗"
 function btCell(rc,real){
@@ -667,7 +673,9 @@ function btCell(rc,real){
 function buildBacktest(){
   var fTeam=$("btTeam").value, fComp=$("btComp").value, fSeason=$("btSeason").value, metric=$("btMetric").value, scope=$("btScope").value;
   var fFrom=$("btFrom").value, fTo=$("btTo").value;
-  if(metric==="picks"){buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo);return;}
+  var fConf=$("btConf")?$("btConf").value:"all";
+  if(metric==="picks"){buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo,fConf);return;}
+  function cf(rc){return (fConf==="all"||(rc&&confTier(rc.prob)===fConf))?rc:null;}
   var UNIT={ts:"tirs",sot:"tirs cadrés",cor:"corners",xg:"buts attendus (xG)"};
   var unit=UNIT[metric]||"tirs";
   var showA=scope!=="match", showB=scope!=="match", showM=scope!=="teams";
@@ -682,11 +690,11 @@ function buildBacktest(){
       if(fTo&&m.date>fTo)return;
       var ph=metricPred(metric,n,m.opp,true,m.date); if(!ph)return;
       var pa=metricPred(metric,m.opp,n,false,m.date);
-      var rcH=ph.rc, realH=realSide(m,metric,"home");
+      var rcH=cf(ph.rc), realH=realSide(m,metric,"home");
       var rcA=null,realA=null,rcM=null,realM=null;
       if(pa){
-        rcA=pa.rc; realA=realSide(m,metric,"away");
-        rcM=recoTotal(ph.exp,ph.sd,pa.exp,pa.sd).rc;
+        rcA=cf(pa.rc); realA=realSide(m,metric,"away");
+        rcM=cf(recoTotal(ph.exp,ph.sd,pa.exp,pa.sd).rc);
         realM=(realH!=null&&realA!=null)?(realH+realA):null;
       }
       rows.push({date:m.date,dt:m.dt,name:n,opp:m.opp,rcH:rcH,realH:realH,rcA:rcA,realA:realA,rcM:rcM,realM:realM});
@@ -779,7 +787,7 @@ function _reelRows(){
       else if(p.code==="V1"&&wh.mw&&wh.mw.home){odd=wh.mw.home;book=wh.mw.book;}
       else if(p.code==="O15"){var g=o.markets&&o.markets["Goals Over/Under"];var r=_ouRowAt(g,1.5);if(r){odd=r[1];book=g.book;}}
       if(odd==null)return;
-      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:p.label,book:book,odd:odd,mini:p.odd,won:pickWon(p.code,m.gf,m.ga),score:m.gf+" - "+m.ga,isPick:true});
+      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:p.label,book:book,odd:odd,mini:p.odd,won:pickWon(p.code,m.gf,m.ga),score:m.gf+" - "+m.ga,isPick:true,conf:p.conf||"moderee"});
     });
     Object.keys(o.markets||{}).forEach(function(mkName){
       var label=null;
@@ -791,7 +799,8 @@ function _reelRows(){
       var row=oddsRowFor(mkt); if(!row)return;
       var real=realMarket(mkName,m); if(real==null||real<=0)return;
       var side=pe.exp>row.line?"over":"under";
-      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+row.line,book:mkt.book,odd:side==="over"?row.over:row.under,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga});
+      var edge=Math.abs(pe.exp-row.line);
+      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+row.line,book:mkt.book,odd:side==="over"?row.over:row.under,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga,conf:edge>2?"elevee":(edge>1?"moderee":"faible")});
     });
     // Over 0,5 but 1re MT (marche "Goals Over/Under First Half", ligne 0.5)
     if(m.htgf!=null&&m.htga!=null){
@@ -802,11 +811,12 @@ function _reelRows(){
         var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);
         if(!pg||!pg2||pg.n<5||pg2.n<5)return;
         if(pg.exp+pg2.exp<2.2)return; // on ne conseille l'over MT1 que si le match promet des buts
-        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"Over 0,5 but 1re MT",book:o.markets[mkName].book,odd:r05[1],mini:1.25,won:htTot>0,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true});
+        var egmt=pg.exp+pg2.exp;
+        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"Over 0,5 but 1re MT",book:o.markets[mkName].book,odd:r05[1],mini:1.25,won:htTot>0,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true,conf:egmt>=3.0?"elevee":(egmt>=2.6?"moderee":"faible")});
       });
       // Mi-temps la plus riche en buts : on suit la tendance historique (2e MT), cote ~2.0
       if(wh.hsh&&wh.hsh.second){
-        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"MT la plus riche : 2e",book:wh.hsh.book,odd:wh.hsh.second,mini:1.90,won:shTot>htTot,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true});
+        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"MT la plus riche : 2e",book:wh.hsh.book,odd:wh.hsh.second,mini:1.90,won:shTot>htTot,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true,conf:"faible"});
       }
     }
     // BTTS avec cotes reelles : Oui si les 2 attaques sont fortes, Non si l'exterieur marque peu
@@ -814,8 +824,8 @@ function _reelRows(){
       var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);
       if(pg&&pg2&&pg.n>=5&&pg2.n>=5){
         var bothScored=(m.gf>0&&m.ga>0);
-        if(pg.exp>=1.2&&pg2.exp>=1.2)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Oui",book:wh.btts.book,odd:wh.btts.yes,mini:1.55,won:bothScored,score:m.gf+" - "+m.ga});
-        else if(pg2.exp<=0.7)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Non",book:wh.btts.book,odd:wh.btts.no,mini:1.55,won:!bothScored,score:m.gf+" - "+m.ga});
+        if(pg.exp>=1.2&&pg2.exp>=1.2)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Oui",book:wh.btts.book,odd:wh.btts.yes,mini:1.55,won:bothScored,score:m.gf+" - "+m.ga,conf:(pg.exp>=1.5&&pg2.exp>=1.5)?"elevee":"moderee"});
+        else if(pg2.exp<=0.7)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Non",book:wh.btts.book,odd:wh.btts.no,mini:1.55,won:!bothScored,score:m.gf+" - "+m.ga,conf:pg2.exp<=0.55?"elevee":"moderee"});
       }
     }
   });
@@ -836,13 +846,13 @@ function _reelRows(){
         else if(p.code==="X2")won=r.ftag>=r.fthg;
         else if(p.code==="V1")won=r.fthg>r.ftag;
         if(won==null)return;
-        out.push({date:r.d,h:r.h,a:r.a,comp:comp,season:r.season,label:p.label,book:book,odd:odd,mini:p.odd,won:won,score:r.fthg+" - "+r.ftag,isPick:true});
+        out.push({date:r.d,h:r.h,a:r.a,comp:comp,season:r.season,label:p.label,book:book,odd:odd,mini:p.odd,won:won,score:r.fthg+" - "+r.ftag,isPick:true,conf:p.conf||"moderee"});
       });
       // Over 2,5 buts quand le modele attend >= 3.2 buts (cote de cloture reelle)
       if(r.o25){
         var pg=predKeyAt(r.h,r.a,true,r.d,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(r.a,r.h,false,r.d,"gf","ga",1.4,1.12,0.95);
         if(pg&&pg2&&pg.n>=5&&pg2.n>=5&&pg.exp+pg2.exp>=3.2){
-          out.push({date:r.d,h:r.h,a:r.a,comp:comp,season:r.season,label:"Over 2,5 buts",book:"Bet365",odd:r.o25,mini:1.55,won:(r.fthg+r.ftag)>=3,score:r.fthg+" - "+r.ftag,isPick:true});
+          out.push({date:r.d,h:r.h,a:r.a,comp:comp,season:r.season,label:"Over 2,5 buts",book:"Bet365",odd:r.o25,mini:1.55,won:(r.fthg+r.ftag)>=3,score:r.fthg+" - "+r.ftag,isPick:true,conf:(pg.exp+pg2.exp)>=3.6?"elevee":"moderee"});
         }
       }
     });
@@ -866,7 +876,7 @@ function buildReel(){
   var body=$("rlBody"); if(!body)return;
   var all=_reelRows();
   fillReelFilters(all);
-  var fT=$("rlType").value,fE=$("rlTeam").value,fC=$("rlComp").value,fS=$("rlSeason").value,fFrom=$("rlFrom").value,fTo=$("rlTo").value;
+  var fT=$("rlType").value,fE=$("rlTeam").value,fC=$("rlComp").value,fS=$("rlSeason").value,fFrom=$("rlFrom").value,fTo=$("rlTo").value,fCf=$("rlConf")?$("rlConf").value:"all";
   var rows=all.filter(function(r){
     if(fT==="__picks"){if(!r.isPick)return false;}
     else if(fT&&fT!=="all"&&r.label!==fT)return false;
@@ -875,6 +885,7 @@ function buildReel(){
     if(fS&&fS!=="all"&&String(r.season)!==String(fS))return false;
     if(fFrom&&r.date<fFrom)return false;
     if(fTo&&r.date>fTo)return false;
+    if(fCf!=="all"&&(r.conf||"moderee")!==fCf)return false;
     return true;
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
@@ -918,10 +929,10 @@ function _pickRulesCalc(home,away,date){
   var pa=predKeyAt(away,home,false,date,"gf","ga",1.4,1.12,0.95);
   if(!ph||!pa||ph.n<5||pa.n<5)return null;
   var eh=ph.exp, ea=pa.exp, gap=eh-ea, eg=eh+ea, out=[];
-  if(gap>=1.0)out.push({code:"1X",label:"Double chance 1X",hit:"80 %",mini:"1.31",odd:1.31,gap:gap});
-  if(-gap>=1.0)out.push({code:"X2",label:"Double chance X2",hit:"77 %",mini:"1.36",odd:1.36,gap:gap});
-  if(gap>=1.3)out.push({code:"V1",label:"Victoire domicile",hit:"67 %",mini:"1.57",odd:1.57,gap:gap});
-  if(eg>=3.0)out.push({code:"O15",label:"Over 1,5 but",hit:"80 %",mini:"1.31",odd:1.31,gap:gap});
+  if(gap>=1.0)out.push({code:"1X",label:"Double chance 1X",hit:"80 %",mini:"1.31",odd:1.31,gap:gap,conf:gap>=1.6?"elevee":(gap>=1.25?"moderee":"faible")});
+  if(-gap>=1.0)out.push({code:"X2",label:"Double chance X2",hit:"77 %",mini:"1.36",odd:1.36,gap:gap,conf:-gap>=1.6?"elevee":(-gap>=1.25?"moderee":"faible")});
+  if(gap>=1.3)out.push({code:"V1",label:"Victoire domicile",hit:"67 %",mini:"1.57",odd:1.57,gap:gap,conf:gap>=1.7?"elevee":(gap>=1.45?"moderee":"faible")});
+  if(eg>=3.0)out.push({code:"O15",label:"Over 1,5 but",hit:"80 %",mini:"1.31",odd:1.31,gap:gap,conf:eg>=3.6?"elevee":(eg>=3.2?"moderee":"faible")});
   return out.length?out:null;
 }
 function pickWon(code,gf,ga){
@@ -931,7 +942,7 @@ function pickWon(code,gf,ga){
   if(code==="O15")return (gf+ga)>=2;
   return null;
 }
-function buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo){
+function buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo,fConf){
   var rows=[],stats={};
   Object.keys(TEAMS).forEach(function(n){
     if(fTeam&&fTeam!=="all"&&n!==fTeam)return;
@@ -943,6 +954,7 @@ function buildBacktestPicks(fTeam,fComp,fSeason,fFrom,fTo){
       if(fTo&&m.date>fTo)return;
       var picks=pickRulesFor(n,m.opp,m.date); if(!picks)return;
       picks.forEach(function(p){
+        if(fConf&&fConf!=="all"&&p.conf!==fConf)return;
         var won=pickWon(p.code,m.gf,m.ga);
         var s=stats[p.label]||(stats[p.label]={n:0,ok:0}); s.n++; if(won)s.ok++;
         rows.push({date:m.date,dt:m.dt,name:n,opp:m.opp,label:p.label,hit:p.hit,mini:p.mini,gap:p.gap,score:m.gf+" - "+m.ga,won:won});
@@ -1155,7 +1167,9 @@ function buildBankroll(){
     if(mode==="kelly"){var bb=b.odd-1;if(bb<=0)return 0;var f=(bb*b.prob-(1-b.prob))/bb;f=Math.max(0,f)*0.5;f=Math.min(f,0.1);return Math.round(f*KCAP);}
     return STAKE;
   }
+  var fConfB=$("bkConf")?$("bkConf").value:"all";
   var bets=bankrollBets().filter(function(b){
+    if(fConfB!=="all"&&confTier(b.prob)!==fConfB)return false;
     if(mScope==="totals"&&!MK_TOTALS[b.market])return false;
     if(mScope==="teams"&&MK_TOTALS[b.market])return false;
     if(bType!=="all"&&marketStat(b.market)!==bType)return false;
@@ -1276,14 +1290,14 @@ window.addEventListener("DOMContentLoaded",function(){
   $("fcat").addEventListener("change",function(){populateTeamFilters();renderTeamList();});
   $("fcomp").addEventListener("change",function(){populateSeasonOptions();renderTeamList();});
   $("fseason").addEventListener("change",renderTeamList);
-  ["btTeam","btComp","btSeason","btMetric","btScope","btFrom","btTo"].forEach(function(id){$(id).addEventListener("change",buildBacktest);});
+  ["btTeam","btComp","btSeason","btMetric","btScope","btConf","btFrom","btTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildBacktest);});
   $("btReset").addEventListener("click",function(){$("btFrom").value="";$("btTo").value="";buildBacktest();});
-  ["bkScope","bkStatus","bkFrom","bkTo","bkStake","bkType"].forEach(function(id){$(id).addEventListener("change",buildBankroll);});
+  ["bkScope","bkStatus","bkFrom","bkTo","bkStake","bkType","bkConf"].forEach(function(id){if($(id))$(id).addEventListener("change",buildBankroll);});
   $("bkReset").addEventListener("click",function(){$("bkFrom").value="";$("bkTo").value="";buildBankroll();});
   $("bkExport").addEventListener("click",exportBankrollCSV);
   $("vbScope").addEventListener("change",buildValueBets);
-  ["rlType","rlMin","rlTeam","rlComp","rlSeason","rlFrom","rlTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildReel);});
-  if($("rlReset"))$("rlReset").addEventListener("click",function(){["rlType","rlTeam","rlComp","rlSeason"].forEach(function(id){$(id).value="all";});$("rlMin").value="0";$("rlFrom").value="";$("rlTo").value="";buildReel();});
+  ["rlType","rlMin","rlConf","rlTeam","rlComp","rlSeason","rlFrom","rlTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildReel);});
+  if($("rlReset"))$("rlReset").addEventListener("click",function(){["rlType","rlTeam","rlComp","rlSeason","rlConf"].forEach(function(id){if($(id))$(id).value="all";});$("rlMin").value="0";$("rlFrom").value="";$("rlTo").value="";buildReel();});
   document.querySelectorAll(".tabs .tab").forEach(function(t){t.addEventListener("click",function(){if(t.dataset.tab)selectTab(t.dataset.tab);});});
   $("go").addEventListener("click",runAnalyse);
   $("modal").addEventListener("click",function(e){if(e.target===$("modal"))closeModal();});
