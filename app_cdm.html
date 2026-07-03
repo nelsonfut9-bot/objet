@@ -166,7 +166,7 @@
       <div class="secTitle" style="margin-top:0">Fiabilité du modèle (backtest)</div>
       <p class="small muted">Backtest 100% honnête : pour chaque match, l'estimation n'utilise QUE les matchs joués AVANT cette date — jamais le match lui-même, jamais les matchs postérieurs. Comme si je n'avais pas vu le résultat. Cliquez une ligne pour voir le détail et la prédiction d'avant-match.</p>
       <div class="filterbar">
-        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="picks">Paris du jour (double chance, victoire, over 1,5)</option><option value="ts">Tirs</option><option value="sot">Tirs cadrés</option><option value="xg">Buts attendus (xG)</option></select></div>
+        <div class="field"><label>Type de pari</label><select id="btMetric"><option value="ts">Tirs</option><option value="picks">Paris du jour (double chance, victoire, over 1,5)</option><option value="sot">Tirs cadrés</option><option value="xg">Buts attendus (xG)</option></select></div>
         <div class="field"><label>Portée</label><select id="btScope"><option value="all">Tout (équipes + match)</option><option value="teams">Par équipe (A &amp; B)</option><option value="match">Match (total) seulement</option></select></div>
         <div class="field"><label>Équipe</label><select id="btTeam"></select></div>
         <div class="field"><label>Championnat</label><select id="btComp"></select></div>
@@ -756,11 +756,15 @@ function buildUpcoming(){
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
 function loadMatch(h,a){if(TEAMS[h])$("home").value=h;if(TEAMS[a])$("away").value=a;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});}
+var _reelBuilt=false;
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});
+  if(name==="reel"&&!_reelBuilt){_reelBuilt=true;var b=$("rlBody");if(b)b.innerHTML='<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Calcul sur tout l\'historique…</td></tr>';setTimeout(buildReel,30);}}
 
 // ---- Suivi reel : uniquement les matchs avec cotes reellement captees ----
 function _ouRowAt(mk,line){var rows=(mk&&mk.rows)||[];for(var i=0;i<rows.length;i++){if(Math.abs(rows[i][0]-line)<0.01)return rows[i];}return null;}
+var _reelCache=null;
 function _reelRows(){
+  if(_reelCache)return _reelCache;
   if(typeof ODDS==="undefined"||!ODDS)return [];
   var out=[];
   Object.keys(ODDS).forEach(function(fid){
@@ -845,6 +849,7 @@ function _reelRows(){
       }
     });
   }
+  _reelCache=out;
   return out;
 }
 function fillReelFilters(rows){
@@ -875,6 +880,7 @@ function buildReel(){
     return true;
   });
   rows.sort(function(a,b){return a.date<b.date?1:-1;});
+  var totalRows=rows.length;
   var stats={},pnl=0,nTaken=0,nWon=0,nSkip=0;
   var minSel=$("rlMin")?$("rlMin").value:"0";
   rows.forEach(function(r){
@@ -884,12 +890,12 @@ function buildReel(){
       var s=stats[r.label]||(stats[r.label]={n:0,ok:0,pnl:0});s.n++;if(r.won)s.ok++;s.pnl+=r.gain;}
     else nSkip++;
   });
-  body.innerHTML=rows.map(function(r){
+  body.innerHTML=rows.slice(0,150).map(function(r){
     var st=r.taken?'<span class="pill W">Pris</span>':'<span class="pill" style="background:#5b6b7d;color:#fff">Non pris (sous le filtre)</span>';
     var res=r.won?'<span style="color:var(--good);font-weight:800">✓ Gagné</span>':'<span style="color:var(--bad);font-weight:800">✗ Perdu</span>';
     var g=r.gain==null?'—':('<span style="color:'+(r.gain>=0?'var(--good)':'var(--bad)')+';font-weight:700">'+(r.gain>=0?'+':'')+r.gain+'</span>');
     return '<tr><td class="small muted">'+dm(r.date)+'</td><td>'+fr(r.h)+' <span class="muted">vs</span> '+fr(r.a)+'</td><td>'+r.label+(r.detail?' <span class="muted small">'+r.detail+'</span>':'')+'</td><td class="small">'+esc(r.book||"?")+'</td><td class="num"><b>'+frn(r.odd)+'</b></td><td class="num small muted">'+frn(r.mini)+'</td><td>'+st+'</td><td class="num">'+r.score+'</td><td>'+res+'</td><td class="num">'+g+'</td></tr>';
-  }).join("")||'<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Aucun pari à cotes réelles pour ce filtre. Les cotes 1X2 / double chance sont captées depuis début juillet 2026 — la base grossit à chaque match joué.</td></tr>';
+  }).join("")+(totalRows>150?'<tr><td colspan="10" class="muted" style="text-align:center;padding:12px">Affichage des 150 paris les plus récents sur '+totalRows+' — les cartes ci-dessus comptent tout. Affine avec les filtres.</td></tr>':'')||'<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Aucun pari à cotes réelles pour ce filtre. Les cotes 1X2 / double chance sont captées depuis début juillet 2026 — la base grossit à chaque match joué.</td></tr>';
   var cards='';
   cards+='<div class="card'+(pnl>=0?' g':'')+'"><div class="v" style="color:'+(pnl>=0?'var(--good)':'var(--bad)')+'">'+(pnl>=0?'+':'')+pnl+'</div><div class="k">Gain net réel (mise '+STAKE+'/pari pris)</div></div>';
   cards+='<div class="card g"><div class="v">'+(nTaken?Math.round(nWon/nTaken*100)+"%":"—")+'</div><div class="k">Réussite des paris pris ('+nWon+'/'+nTaken+')</div></div>';
@@ -903,7 +909,13 @@ function buildReel(){
   $("rlCards").innerHTML=cards;
 }
 // ---- Suivi : backtest des Paris du jour (memes regles, zero lookahead) ----
+var _prMemo={};
 function pickRulesFor(home,away,date){
+  var _k=home+"|"+away+"|"+date;
+  if(_prMemo[_k]!==undefined)return _prMemo[_k];
+  var _r=_pickRulesCalc(home,away,date); _prMemo[_k]=_r; return _r;
+}
+function _pickRulesCalc(home,away,date){
   var ph=predKeyAt(home,away,true,date,"gf","ga",1.4,1.12,0.95);
   var pa=predKeyAt(away,home,false,date,"gf","ga",1.4,1.12,0.95);
   if(!ph||!pa||ph.n<5||pa.n<5)return null;
@@ -1260,7 +1272,7 @@ window.addEventListener("DOMContentLoaded",function(){
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
   calibrateModel();
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildReel(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
   if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
   $("q").addEventListener("input",renderTeamList);
   $("fcat").addEventListener("change",function(){populateTeamFilters();renderTeamList();});
