@@ -122,8 +122,7 @@ def add_fixtures(resp, matches, pending, upcoming_raw, league_id, prio):
 ODDSFILE="odds.json"
 ODDS_MARKETS={"total shots","shots. home total","shots. away total","total shotongoal",
     "home total shotongoal","away total shotongoal","home shots on target","away shots on target",
-    "goals over/under","corners over under","total - corners","total corners",
-    "cards over/under","total cards","total - cards",
+    "goals over/under",
     "goals over/under first half","goals over/under - first half","first half goals over/under"}
 BTTS_MARKETS={"both teams score","both teams to score"}
 def _parse_btts(values):

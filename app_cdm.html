@@ -785,8 +785,6 @@ function _reelRows(){
       var label=null;
       if(mkName==="Total Shots")label="Total tirs";
       else if(mkName==="Total ShotOnGoal")label="Total tirs cadrés";
-      else if(/corner/i.test(mkName))label="Total corners";
-      else if(/card/i.test(mkName))label="Total cartons";
       if(!label)return;
       var mkt=o.markets[mkName]; if(!mkt||!mkt.rows||!mkt.rows.length)return;
       var pe=marketPre(mkName,o.h,o.a,o.date); if(!pe)return;
