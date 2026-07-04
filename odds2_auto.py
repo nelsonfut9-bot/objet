@@ -70,7 +70,7 @@ def parse_markets(ev):
         for mkt in markets or []:
             name=str(mkt.get("name") or "").lower()
             rows=mkt.get("odds") or []
-            is_fh=("1st" in name or "first half" in name)
+            is_fh=("1st" in name or "first half" in name or name.endswith(" ht"))
             if name in ("ml","match winner","1x2","full time result","match result") and not is_fh:
                 for o in rows:
                     if _f(o.get("home")):mw_h.append((_f(o.get("home")),bname))
@@ -88,7 +88,7 @@ def parse_markets(ev):
                 for o in rows:
                     if _f(o.get("yes")):btts_y.append((_f(o.get("yes")),bname))
                     if _f(o.get("no")):btts_n.append((_f(o.get("no")),bname))
-            elif "over/under" in name or name=="totals":
+            elif "over/under" in name or name=="totals" or name=="totals ht":
                 tgt=fh if is_fh else ou
                 for o in rows:
                     ln=_f(o.get("max") if o.get("max") is not None else o.get("hdp") if o.get("hdp") is not None else o.get("line"))
