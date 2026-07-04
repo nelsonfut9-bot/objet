@@ -790,6 +790,13 @@ function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t
   if(name==="suivi"&&_archState==="none"){ensureArchive(function(){buildBacktest();});}}
 
 // ---- Suivi reel : uniquement les matchs avec cotes reellement captees ----
+// meilleur prix entre API-Football et odds-api.io (o.alt)
+function bestOdd(base,baseBook,altObj){
+  var b=base!=null?{odd:base,book:baseBook}:null;
+  var a=(altObj&&altObj.odd)?{odd:altObj.odd,book:(altObj.book||"?")+" ²"}:null;
+  if(b&&a)return a.odd>b.odd?a:b;
+  return b||a;
+}
 function _ouRowAt(mk,line){var rows=(mk&&mk.rows)||[];for(var i=0;i<rows.length;i++){if(Math.abs(rows[i][0]-line)<0.01)return rows[i];}return null;}
 var _reelCache=null;
 function _reelRows(){
@@ -800,14 +807,16 @@ function _reelRows(){
     var o=ODDS[fid]; if(!o)return;
     var m=findPlayed(o.h,o.a,o.date); if(!m)return;
     var wh=o.which||{};
+    var alt=o.alt||{};
     var pks=pickRulesFor(o.h,o.a,o.date)||[];
     pks.forEach(function(p){
-      var odd=null,book=null;
-      if(p.code==="1X"&&wh.dc&&wh.dc["1X"]){odd=wh.dc["1X"];book=wh.dc.book;}
-      else if(p.code==="X2"&&wh.dc&&wh.dc["X2"]){odd=wh.dc["X2"];book=wh.dc.book;}
-      else if(p.code==="V1"&&wh.mw&&wh.mw.home){odd=wh.mw.home;book=wh.mw.book;}
-      else if(p.code==="O15"){var g=o.markets&&o.markets["Goals Over/Under"];var r=_ouRowAt(g,1.5);if(r){odd=r[1];book=g.book;}}
-      if(odd==null)return;
+      var pick=null;
+      if(p.code==="1X")pick=bestOdd(wh.dc&&wh.dc["1X"],wh.dc&&wh.dc.book,alt.dc&&alt.dc["1X"]);
+      else if(p.code==="X2")pick=bestOdd(wh.dc&&wh.dc["X2"],wh.dc&&wh.dc.book,alt.dc&&alt.dc["X2"]);
+      else if(p.code==="V1")pick=bestOdd(wh.mw&&wh.mw.home,wh.mw&&wh.mw.book,alt.mw&&alt.mw.home);
+      else if(p.code==="O15"){var g=o.markets&&o.markets["Goals Over/Under"];var r=_ouRowAt(g,1.5);pick=bestOdd(r?r[1]:null,g&&g.book,alt.ou&&alt.ou["1.5"]&&alt.ou["1.5"].over);}
+      if(!pick)return;
+      var odd=pick.odd,book=pick.book;
       out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:p.label,book:book,odd:odd,mini:p.odd,won:pickWon(p.code,m.gf,m.ga),score:m.gf+" - "+m.ga,isPick:true,conf:p.conf||"moderee"});
     });
     Object.keys(o.markets||{}).forEach(function(mkName){
@@ -828,12 +837,14 @@ function _reelRows(){
       var htTot=m.htgf+m.htga, shTot=(m.gf+m.ga)-htTot;
       Object.keys(o.markets||{}).forEach(function(mkName){
         if(!/first half/i.test(mkName)||!/over\/under/i.test(mkName))return;
-        var r05=_ouRowAt(o.markets[mkName],0.5); if(!r05)return;
+        var r05=_ouRowAt(o.markets[mkName],0.5);
+        var b05=bestOdd(r05?r05[1]:null,o.markets[mkName].book,(o.alt&&o.alt.fh&&o.alt.fh["0.5"])?o.alt.fh["0.5"].over:null);
+        if(!b05)return; r05=[0.5,b05.odd];
         var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);
         if(!pg||!pg2||pg.n<5||pg2.n<5)return;
         if(pg.exp+pg2.exp<2.2)return; // on ne conseille l'over MT1 que si le match promet des buts
         var egmt=pg.exp+pg2.exp;
-        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"Over 0,5 but 1re MT",book:o.markets[mkName].book,odd:r05[1],mini:1.25,won:htTot>0,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true,conf:egmt>=3.0?"elevee":(egmt>=2.6?"moderee":"faible")});
+        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"Over 0,5 but 1re MT",book:b05.book,odd:b05.odd,mini:1.25,won:htTot>0,score:m.htgf+"-"+m.htga+" (MT) / "+m.gf+" - "+m.ga,isPick:true,conf:egmt>=3.0?"elevee":(egmt>=2.6?"moderee":"faible")});
       });
       // Mi-temps la plus riche en buts : on suit la tendance historique (2e MT), cote ~2.0
       if(wh.hsh&&wh.hsh.second){
@@ -845,8 +856,10 @@ function _reelRows(){
       var pg=predKeyAt(o.h,o.a,true,o.date,"gf","ga",1.4,1.12,0.95), pg2=predKeyAt(o.a,o.h,false,o.date,"gf","ga",1.4,1.12,0.95);
       if(pg&&pg2&&pg.n>=5&&pg2.n>=5){
         var bothScored=(m.gf>0&&m.ga>0);
-        if(pg.exp>=1.2&&pg2.exp>=1.2)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Oui",book:wh.btts.book,odd:wh.btts.yes,mini:1.55,won:bothScored,score:m.gf+" - "+m.ga,conf:(pg.exp>=1.5&&pg2.exp>=1.5)?"elevee":"moderee"});
-        else if(pg2.exp<=0.7)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Non",book:wh.btts.book,odd:wh.btts.no,mini:1.55,won:!bothScored,score:m.gf+" - "+m.ga,conf:pg2.exp<=0.55?"elevee":"moderee"});
+        var by=bestOdd(wh.btts.yes,wh.btts.book,(o.alt&&o.alt.btts)?o.alt.btts.yes:null);
+        var bn=bestOdd(wh.btts.no,wh.btts.book,(o.alt&&o.alt.btts)?o.alt.btts.no:null);
+        if(pg.exp>=1.2&&pg2.exp>=1.2&&by)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Oui",book:by.book,odd:by.odd,mini:1.55,won:bothScored,score:m.gf+" - "+m.ga,conf:(pg.exp>=1.5&&pg2.exp>=1.5)?"elevee":"moderee"});
+        else if(pg2.exp<=0.7&&bn)out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"BTTS Non",book:bn.book,odd:bn.odd,mini:1.55,won:!bothScored,score:m.gf+" - "+m.ga,conf:pg2.exp<=0.55?"elevee":"moderee"});
       }
     }
   });
