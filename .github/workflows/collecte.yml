@@ -1,24 +1,13 @@
-name: Collecte automatique
+name: Collecte quotidienne
 
 on:
   schedule:
-    # GitHub saute/retarde souvent les crons gratuits : on multiplie les tentatives (toutes les 15 min).
-    - cron: "5 * * * *"
-    - cron: "20 * * * *"
-    - cron: "35 * * * *"
-    - cron: "50 * * * *"
+    - cron: "10 0 * * *"
+    - cron: "0 6 * * *"
   workflow_dispatch:
-  # declenchement externe fiable (ex: cron-job.org) via l'API GitHub repository_dispatch
-  repository_dispatch:
-    types: [collecte]
 
 permissions:
   contents: write
-
-# jamais deux collectes en meme temps (evite les conflits de push)
-concurrency:
-  group: collecte-objet
-  cancel-in-progress: false
 
 jobs:
   collecte:
@@ -33,11 +22,14 @@ jobs:
         env:
           API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
         run: python collecte_auto.py
+      - name: Cotes source 2 (odds-api.io)
+        env:
+          ODDSAPI_IO_KEY: ${{ secrets.ODDSAPI_IO_KEY }}
+        run: python odds2_auto.py || echo "source 2 indisponible (non bloquant)"
       - name: Publier les donnees
         run: |
           git config user.name "collecte-bot"
           git config user.email "bot@users.noreply.github.com"
           git add -A
           git commit -m "MAJ donnees" || echo "Rien a committer"
-          git pull --rebase --autostash || true
           git push
