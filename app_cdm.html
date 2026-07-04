@@ -764,9 +764,30 @@ function buildUpcoming(){
   document.querySelectorAll("#up tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
 function loadMatch(h,a){if(TEAMS[h])$("home").value=h;if(TEAMS[a])$("away").value=a;selectTab("analyse");runAnalyse();window.scrollTo(0,0);}
+// archive complete (>120 matchs/equipe) chargee a la demande pour le backtest profond
+var _archState="none"; // none | loading | done
+function ensureArchive(cb){
+  if(_archState==="done"){cb();return;}
+  if(_archState==="loading")return;
+  _archState="loading";
+  var s=document.createElement("script");
+  s.src="donnees_archive.js";
+  s.onload=function(){
+    try{
+      if(typeof TEAMS_FULL!=="undefined"&&TEAMS_FULL){
+        Object.keys(TEAMS_FULL).forEach(function(n){if(TEAMS[n])TEAMS[n].matches=TEAMS_FULL[n].matches;});
+        _prMemo={}; _reelCache=null; calibrateModel();
+      }
+    }catch(e){}
+    _archState="done"; cb();
+  };
+  s.onerror=function(){_archState="done"; cb();}; // pas d'archive publiee : on continue avec la base legere
+  document.body.appendChild(s);
+}
 var _reelBuilt=false;
 function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});
-  if(name==="reel"&&!_reelBuilt){_reelBuilt=true;var b=$("rlBody");if(b)b.innerHTML='<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Calcul sur tout l\'historique…</td></tr>';setTimeout(buildReel,30);}}
+  if(name==="reel"&&!_reelBuilt){_reelBuilt=true;var b=$("rlBody");if(b)b.innerHTML='<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Chargement de l\'historique complet…</td></tr>';setTimeout(function(){ensureArchive(buildReel);},30);}
+  if(name==="suivi"&&_archState==="none"){ensureArchive(function(){buildBacktest();});}}
 
 // ---- Suivi reel : uniquement les matchs avec cotes reellement captees ----
 function _ouRowAt(mk,line){var rows=(mk&&mk.rows)||[];for(var i=0;i<rows.length;i++){if(Math.abs(rows[i][0]-line)<0.01)return rows[i];}return null;}

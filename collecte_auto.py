@@ -98,6 +98,16 @@ def can_continue(used):
     if used[0]>=MAX_RUN: return False
     if _rem[0] is not None and _rem[0]<=SAFETY_MARGIN: return False
     return True
+def write_if_changed(path,content,skip_lines=0):
+    """Ecrit seulement si le contenu (hors skip_lines premieres lignes) a change. Retourne True si ecrit."""
+    if os.path.exists(path):
+        try:
+            old=open(path,encoding="utf-8").read()
+            if old.split("\n",skip_lines)[skip_lines:]==content.split("\n",skip_lines)[skip_lines:]:
+                return False
+        except: pass
+    open(path,"w",encoding="utf-8").write(content)
+    return True
 def load_json(p,d):
     if os.path.exists(p):
         try: return json.load(open(p,encoding="utf-8"))
@@ -254,6 +264,8 @@ def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=120):
         markets, which = res
         if markets or which:  # on n'ecrase jamais des cotes existantes par du vide (match deja joue)
             prev=odds.get(fid) or {}
+            if prev and prev.get("markets")==markets and prev.get("which")==which:
+                continue  # rien de neuf : on ne modifie pas le fichier (evite des commits/deploiements inutiles)
             entry={"h":u.get("h"),"a":u.get("a"),"date":u.get("date"),"markets":markets,"which":which,"t1":now_iso}
             # CLV : on conserve le tout premier releve de cotes (ouverture)
             if prev.get("open"):
@@ -261,7 +273,7 @@ def collect_odds(upcoming_raw, recent_ft, used, up_limit=40, rc_limit=120):
             else:
                 entry["open"]=markets; entry["t0"]=now_iso
             odds[fid]=entry
-    json.dump(odds,open(ODDSFILE,"w",encoding="utf-8"))
+    write_if_changed(ODDSFILE,json.dumps(odds,ensure_ascii=False))
     return odds
 
 def run():
@@ -388,7 +400,7 @@ def run():
     # on sauvegarde TOUJOURS ce qui a ete collecte (meme apres une erreur)
     progress["pending_fixtures"]=[it for it in progress["pending_fixtures"] if it["fid"] not in matches]
     aggregate_and_write(matches, progress["upcoming_raw"], odds)
-    json.dump(progress,open(PROGRESS,"w",encoding="utf-8")); json.dump(matches,open(MATCHES,"w",encoding="utf-8"))
+    write_if_changed(PROGRESS,json.dumps(progress,ensure_ascii=False)); write_if_changed(MATCHES,json.dumps(matches,ensure_ascii=False))
     print(f"  Requetes: {used[0]} | matchs: {len(matches)} | attente: {len(progress['pending_fixtures'])}")
 
 def rec(opp,comp,season,home,gf,ga,me,opst):
@@ -408,7 +420,8 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
         r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]; r2["dt"]=m.get("dt"); r2["htgf"]=m.get("hta"); r2["htga"]=m.get("hth")
         byteam.setdefault(m["h"],[]).append(r1)
         byteam.setdefault(m["a"],[]).append(r2)
-    TEAMS={}
+    LIGHT_PER_TEAM=120
+    TEAMS={}; FULL={}
     for name,recs in byteam.items():
         recs.sort(key=lambda r:r["date"],reverse=True)
         up=[]
@@ -416,7 +429,8 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
             if u["h"]==name: up.append({"date":u["date"],"time":u.get("time"),"opp":u["a"],"comp":u["lname"],"home":True})
             elif u["a"]==name: up.append({"date":u["date"],"time":u.get("time"),"opp":u["h"],"comp":u["lname"],"home":False})
         up.sort(key=lambda x:x["date"])
-        TEAMS[name]={"matches":recs[:MAX_PER_TEAM],"upcoming":up[:8]}
+        TEAMS[name]={"matches":recs[:LIGHT_PER_TEAM],"upcoming":up[:8]}
+        if len(recs)>LIGHT_PER_TEAM: FULL[name]={"matches":recs[:MAX_PER_TEAM]}
     allts=[r["ts"] for t in TEAMS.values() for r in t["matches"]]
     la=round(mean(allts),1) if allts else 12.5
     comps=sorted([c for c in comps if c])
@@ -433,8 +447,11 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
         "var COMP_CAT = "+json.dumps(comp_cat,ensure_ascii=False)+";\n"
         "var TEAMS = "+json.dumps(TEAMS,ensure_ascii=False)+";\n"
         "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n")
-    open(OUTPUT,"w",encoding="utf-8").write(payload)
-    print(f"  -> {OUTPUT}: {len(TEAMS)} equipes, {len(comps)} competitions.")
+    write_if_changed(OUTPUT,payload,skip_lines=2)  # ignore le commentaire + GENERATED : pas de commit si donnees identiques
+    arch=("// Archive complete (equipes >120 matchs). Chargee a la demande par l'app.\n"
+        "var TEAMS_FULL = "+json.dumps(FULL,ensure_ascii=False)+";\n")
+    write_if_changed("donnees_archive.js",arch,skip_lines=1)
+    print(f"  -> {OUTPUT}: {len(TEAMS)} equipes ({len(FULL)} en archive), {len(comps)} competitions.")
 
 if __name__=="__main__":
     run()
