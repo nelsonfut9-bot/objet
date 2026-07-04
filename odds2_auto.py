@@ -51,62 +51,47 @@ def best(cands):
     o,b=max(cands,key=lambda x:x[0])
     return {"odd":round(float(o),3),"book":b}
 
-def parse_markets(payload):
-    """Extrait le meilleur prix par marche utile depuis la reponse /odds (defensif : structures variables)."""
+def _f(x):
+    try: return float(x)
+    except: return None
+
+def parse_markets(ev):
+    """ev = reponse /odds pour UN event : {'bookmakers': {book: [ {name, odds:[{...}]} ]}}"""
     mw_h=[];mw_d=[];mw_a=[];dc_1x=[];dc_x2=[];btts_y=[];btts_n=[];ou={};fh={}
-    def walk_bookmaker(bname,markets):
+    bks=ev.get("bookmakers") or {}
+    if isinstance(bks,list):  # tolerance si liste
+        bks={ (b.get("name") or "?"): (b.get("markets") or []) for b in bks if isinstance(b,dict)}
+    for bname,markets in bks.items():
         for mkt in markets or []:
-            name=str(mkt.get("name") or mkt.get("market") or "").lower()
-            odds=mkt.get("odds") or mkt.get("outcomes") or mkt.get("values") or []
-            def val(o):
-                try: return float(o.get("price") or o.get("odd") or o.get("odds"))
-                except: return None
-            def lab(o): return str(o.get("name") or o.get("label") or o.get("value") or "").lower().strip()
-            def hdp(o):
-                for k in ("hdp","line","handicap","points","total"):
-                    if o.get(k) is not None:
-                        try: return float(o.get(k))
-                        except: pass
-                m=re.search(r"(\d+(?:\.\d+)?)",lab(o))
-                return float(m.group(1)) if m else None
-            is_fh=("1st half" in name or "first half" in name or "1e mi" in name)
-            if name in ("ml","match winner","1x2","full time result","match result","moneyline"):
-                for o in odds:
-                    l=lab(o);v=val(o)
-                    if v is None:continue
-                    if l in("1","home"):mw_h.append((v,bname))
-                    elif l in("x","draw"):mw_d.append((v,bname))
-                    elif l in("2","away"):mw_a.append((v,bname))
+            name=str(mkt.get("name") or "").lower()
+            rows=mkt.get("odds") or []
+            is_fh=("1st" in name or "first half" in name)
+            if name in ("ml","match winner","1x2","full time result","match result") and not is_fh:
+                for o in rows:
+                    if _f(o.get("home")):mw_h.append((_f(o.get("home")),bname))
+                    if _f(o.get("draw")):mw_d.append((_f(o.get("draw")),bname))
+                    if _f(o.get("away")):mw_a.append((_f(o.get("away")),bname))
             elif "double chance" in name:
-                for o in odds:
-                    l=lab(o).replace(" ","");v=val(o)
-                    if v is None:continue
-                    if l in("1x","home/draw","homeordraw"):dc_1x.append((v,bname))
-                    elif l in("x2","draw/away","draworaway"):dc_x2.append((v,bname))
+                for o in rows:
+                    for k,v in o.items():
+                        kk=str(k).lower().replace("_","").replace("-","").replace(" ","")
+                        vv=_f(v)
+                        if vv is None:continue
+                        if kk in ("1x","homedraw","homeordraw"):dc_1x.append((vv,bname))
+                        elif kk in ("x2","drawaway","draworaway"):dc_x2.append((vv,bname))
             elif "both teams" in name or name=="btts":
-                for o in odds:
-                    l=lab(o);v=val(o)
-                    if v is None:continue
-                    if l in("yes","oui"):btts_y.append((v,bname))
-                    elif l in("no","non"):btts_n.append((v,bname))
-            elif ("over/under" in name or "total" in name or "totals" in name) and "corner" not in name and "card" not in name and "team" not in name:
+                for o in rows:
+                    if _f(o.get("yes")):btts_y.append((_f(o.get("yes")),bname))
+                    if _f(o.get("no")):btts_n.append((_f(o.get("no")),bname))
+            elif "over/under" in name or name=="totals":
                 tgt=fh if is_fh else ou
-                for o in odds:
-                    l=lab(o);v=val(o);ln=hdp(o)
-                    if v is None or ln is None:continue
+                for o in rows:
+                    ln=_f(o.get("max") if o.get("max") is not None else o.get("hdp") if o.get("hdp") is not None else o.get("line"))
+                    ov=_f(o.get("over")); un=_f(o.get("under"))
+                    if ln is None:continue
                     e=tgt.setdefault(ln,{})
-                    if l.startswith("over") or l=="o":
-                        if v>(e.get("over") or {}).get("odd",0): e["over"]={"odd":v,"book":bname}
-                    elif l.startswith("under") or l=="u":
-                        if v>(e.get("under") or {}).get("odd",0): e["under"]={"odd":v,"book":bname}
-    # formats possibles : {bookmakers:[{name,markets:[...]}]} ou liste directe
-    if isinstance(payload,dict):
-        for bk in payload.get("bookmakers") or []:
-            walk_bookmaker(bk.get("name","?"),bk.get("markets") or bk.get("odds"))
-    elif isinstance(payload,list):
-        for bk in payload:
-            if isinstance(bk,dict):
-                walk_bookmaker(bk.get("bookmaker") or bk.get("name","?"),bk.get("markets") or [bk])
+                    if ov and ov>((e.get("over") or {}).get("odd") or 0):e["over"]={"odd":ov,"book":bname}
+                    if un and un>((e.get("under") or {}).get("odd") or 0):e["under"]={"odd":un,"book":bname}
     out={}
     if best(mw_h):out["mw"]={"home":best(mw_h),"draw":best(mw_d),"away":best(mw_a)}
     if best(dc_1x) or best(dc_x2):out["dc"]={"1X":best(dc_1x),"X2":best(dc_x2)}
@@ -122,7 +107,6 @@ def run():
     upcoming=progress.get("upcoming_raw",{})
     today=datetime.date.today().isoformat()
     horizon=(datetime.date.today()+datetime.timedelta(days=3)).isoformat()
-    # cible : matchs a venir sous 3 jours, sans cotes alt fraiches (<6h)
     now=time.time()
     targets=[]
     for fid,u in upcoming.items():
@@ -133,44 +117,59 @@ def run():
     targets.sort(key=lambda x:x[1].get("date",""))
     if not targets:
         print("Aucun match a croiser."); return
-    # 1 requete : tous les events football a venir (14 jours)
     events=get("/events",{"sport":"football","limit":5000}) or []
     if isinstance(events,dict): events=events.get("events") or events.get("data") or []
-    idx={}
+    idx={}   # (normH, normA) -> liste de (date, id)
     for ev in events:
         try:
-            h=ev.get("home") or (ev.get("participants") or [{}])[0].get("name") or ev.get("homeTeam")
-            a=ev.get("away") or (ev.get("participants") or [{},{}])[1].get("name") or ev.get("awayTeam")
+            h=ev.get("home"); a=ev.get("away")
             if isinstance(h,dict):h=h.get("name")
             if isinstance(a,dict):a=a.get("name")
-            d=str(ev.get("date") or ev.get("startTime") or ev.get("starts") or "")[:10]
-            if h and a and d: idx[(norm(h),norm(a),d)]=ev.get("id") or ev.get("eventId")
+            d=str(ev.get("date") or ev.get("startTime") or "")[:10]
+            eid=ev.get("id") or ev.get("eventId")
+            if h and a and d and eid: idx.setdefault((norm(h),norm(a)),[]).append((d,eid))
         except: continue
-    print(f"events odds-api.io: {len(idx)} indexes | cibles: {len(targets)}")
-    matched=0;fetched=0
+    def close_date(d1,d2):
+        try:
+            a=datetime.date.fromisoformat(d1);b=datetime.date.fromisoformat(d2)
+            return abs((a-b).days)<=1
+        except: return d1==d2
+    def find_eid(u):
+        kh,ka=norm(u["h"]),norm(u["a"])
+        for cand in (idx.get((kh,ka)) or []):
+            if close_date(cand[0],u["date"]): return cand[1]
+        # tolerance : inclusion partielle des noms
+        for (nh,na),lst in idx.items():
+            if ((kh in nh or nh in kh) and (ka in na or na in ka)) and len(kh)>=5 and len(ka)>=5:
+                for cand in lst:
+                    if close_date(cand[0],u["date"]): return cand[1]
+        return None
+    pairs=[]
     for fid,u in targets:
+        eid=find_eid(u)
+        if eid: pairs.append((fid,u,str(eid)))
+    print(f"events odds-api.io: {len(events)} | cibles: {len(targets)} | associes: {len(pairs)}")
+    fetched=0
+    for k in range(0,len(pairs),10):
         if _used[0]>=BUDGET-2: break
-        key=(norm(u["h"]),norm(u["a"]),u["date"])
-        eid=idx.get(key)
-        if not eid:
-            # tolerance : meme date, noms partiels
-            for (nh,na,dd),e in idx.items():
-                if dd==u["date"] and (key[0] in nh or nh in key[0]) and (key[1] in na or na in key[1]):
-                    eid=e;break
-        if not eid: continue
-        matched+=1
-        payload=get("/odds",{"eventId":eid,"bookmakers":BOOKIES})
+        chunk=pairs[k:k+10]
+        payload=get("/odds/multi",{"eventIds":",".join(p[2] for p in chunk),"bookmakers":BOOKIES})
         time.sleep(SLEEP)
         if payload is None: break
-        alt=parse_markets(payload)
-        if not alt: continue
-        alt["_ts"]=int(now)
-        entry=odds.get(fid) or {"h":u["h"],"a":u["a"],"date":u["date"],"markets":{},"which":{}}
-        entry["alt"]=alt
-        odds[fid]=entry
-        fetched+=1
+        evs=payload if isinstance(payload,list) else (payload.get("events") or payload.get("data") or [])
+        by_id={str(e.get("id") or e.get("eventId")):e for e in evs if isinstance(e,dict)}
+        for fid,u,eid in chunk:
+            ev=by_id.get(eid)
+            if not ev: continue
+            alt=parse_markets(ev)
+            if not alt: continue
+            alt["_ts"]=int(now)
+            entry=odds.get(fid) or {"h":u["h"],"a":u["a"],"date":u["date"],"markets":{},"which":{}}
+            entry["alt"]=alt
+            odds[fid]=entry
+            fetched+=1
     json.dump(odds,open(ODDSFILE,"w",encoding="utf-8"),ensure_ascii=False)
-    print(f"croises: {matched} | cotes alt ecrites: {fetched} | requetes: {_used[0]}")
+    print(f"cotes alt ecrites: {fetched} | requetes: {_used[0]}")
 
 if __name__=="__main__":
     run()
