@@ -13,6 +13,7 @@ BASE_URL = "https://v3.football.api-sports.io"
 OUTPUT   = "donnees_cdm.js"; PROGRESS="progress.json"; MATCHES="matches.json"
 SAFETY_MARGIN=60; MAX_RUN=2000; MAX_PER_TEAM=400; SLEEP=0.10  # MAX_RUN volontairement bas : on sauvegarde souvent (checkpoints)
 WC_LEAGUE=1; WC_SEASON=2026; PRIORITY_SEASONS=[2020,2021,2022,2023,2024,2025,2026]
+CURRENT_SEASONS={2025,2026}; REFRESH_H=24  # saisons en cours : calendrier re-verifie ~1x/jour (capte les nouveaux tours)
 
 COMPETITIONS=[
     (39,"Premier League","club",[2021,2022,2023,2024,2025]),
@@ -297,8 +298,11 @@ def run():
             print("  Ancien format detecte -> reinitialisation propre.")
             matches={}; progress={"priority_teams":{},"fixtures_done":{},"pending_fixtures":[],"upcoming_raw":{}}
     try:
-        if not progress["priority_teams"]:
-            if not can_continue(used): raise Stop()
+        # ===== PRIORITE 0 : CALENDRIER COUPE DU MONDE, rafraichi a CHAQUE run =====
+        # (1 requete) : capte les nouveaux tours des qu'ils sont programmes -> 8e, quarts, demies, finale.
+        # Avant, on ne recuperait le calendrier CM qu'au tout premier run : les tours a elimination
+        # directe annonces apres les poules n'etaient jamais detectes.
+        if can_continue(used):
             resp=api_get("/fixtures",{"league":WC_LEAGUE,"season":WC_SEASON},used)
             allt={}; alive={}; live={"NS","TBD","1H","HT","2H","ET","BT","P","SUSP","INT","LIVE"}
             for fx in resp:
@@ -307,9 +311,16 @@ def run():
                 if fx["fixture"]["status"]["short"] in live:
                     for side in ("home","away"):
                         t=fx["teams"][side]; alive[str(t["id"])]=t["name"]
-            progress["priority_teams"]=alive if alive else allt
+            if not progress["priority_teams"]:
+                progress["priority_teams"]=alive if alive else allt
+                print("  Selections prioritaires:",len(progress["priority_teams"]))
+            else:
+                # nouveaux tours : on ajoute les equipes encore en lice sans jamais retirer l'historique
+                added=0
+                for k,v in (alive if alive else allt).items():
+                    if k not in progress["priority_teams"]: progress["priority_teams"][k]=v; added+=1
+                if added: print(f"  +{added} equipe(s) CM ajoutee(s) (nouveau tour).")
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],str(WC_LEAGUE),True)
-            print("  Selections prioritaires:",len(progress["priority_teams"]))
         # ===== PRIORITE 1 : RESULTATS RECENTS =====
         # matchs "a venir" dont la date est passee -> on recupere le resultat (calendriers en cache sinon)
         today_s=datetime.date.today().isoformat()
@@ -386,12 +397,22 @@ def run():
         while i<len(nat_tasks) or j<len(club_tasks):
             if j<len(club_tasks): fixture_tasks.append(club_tasks[j]); j+=1
             if i<len(nat_tasks): fixture_tasks.append(nat_tasks[i]); i+=1
+        now_ts=time.time()
         for key,params,lid,prio in fixture_tasks:
-            if progress["fixtures_done"].get(key): continue
+            season=params.get("season")
+            mark=progress["fixtures_done"].get(key)
+            if mark:
+                # saison passee : mis en cache pour toujours. Saison en cours : re-verifie tous les REFRESH_H
+                # pour capter les nouveaux tours (coupes, phases finales de C1/C3, etc.).
+                if season not in CURRENT_SEASONS:
+                    continue
+                try: fresh=(now_ts-float(mark))<REFRESH_H*3600
+                except: fresh=False
+                if fresh: continue
             if not can_continue(used): raise Stop()
             resp=api_get("/fixtures",params,used)
             add_fixtures(resp,matches,progress["pending_fixtures"],progress["upcoming_raw"],lid,prio)
-            if resp: progress["fixtures_done"][key]=True
+            if resp: progress["fixtures_done"][key]=(now_ts if season in CURRENT_SEASONS else True)
             time.sleep(SLEEP)
     except Stop:
         print("  Pause (quota/plafond/reseau). Reprise au prochain run.")
