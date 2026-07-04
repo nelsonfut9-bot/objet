@@ -157,6 +157,23 @@ def run():
         time.sleep(SLEEP)
         if payload is None: break
         evs=payload if isinstance(payload,list) else (payload.get("events") or payload.get("data") or [])
+        if k==0:  # debug structure (1er lot seulement)
+            try:
+                import json as _j
+                print("  DEBUG type payload:",type(payload).__name__,"| nb evs:",len(evs) if isinstance(evs,list) else "?")
+                if isinstance(evs,list) and evs:
+                    e0=evs[0]
+                    print("  DEBUG keys ev:",list(e0.keys())[:12])
+                    bk=e0.get("bookmakers")
+                    print("  DEBUG type bookmakers:",type(bk).__name__)
+                    if isinstance(bk,dict):
+                        for bn,ms in list(bk.items())[:1]:
+                            print("  DEBUG book:",bn,"| marches:",[m.get("name") for m in (ms or [])][:15])
+                    elif isinstance(bk,list) and bk:
+                        print("  DEBUG book[0]:",_j.dumps(bk[0])[:400])
+                elif isinstance(payload,dict):
+                    print("  DEBUG keys payload:",list(payload.keys())[:12])
+            except Exception as _e: print("  DEBUG err:",_e)
         by_id={str(e.get("id") or e.get("eventId")):e for e in evs if isinstance(e,dict)}
         for fid,u,eid in chunk:
             ev=by_id.get(eid)
