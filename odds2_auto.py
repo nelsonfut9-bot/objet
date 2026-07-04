@@ -15,7 +15,7 @@ KEY=os.environ.get("ODDSAPI_IO_KEY","")
 BASE="https://api.odds-api.io/v3"
 ODDSFILE="odds.json"; PROGRESS="progress.json"
 BUDGET=90; SLEEP=0.15
-BOOKIES="Bet365,Pinnacle,Unibet,Bwin,William Hill"
+BOOKIES="Bet365,Winamax FR,Betclic FR,Unibet FR,Bwin FR,William Hill"
 
 def norm(s):
     s=unicodedata.normalize("NFD",str(s)).encode("ascii","ignore").decode()
