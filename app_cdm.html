@@ -819,19 +819,53 @@ function _reelRows(){
       var odd=pick.odd,book=pick.book;
       out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:p.label,book:book,odd:odd,mini:p.odd,won:pickWon(p.code,m.gf,m.ga),score:m.gf+" - "+m.ga,isPick:true,conf:p.conf||"moderee"});
     });
+    var SHOT_MKTS={
+      "Total Shots":["Total tirs","ts"],
+      "Total ShotOnGoal":["Total tirs cadrés","sot"],
+      "Shots. Home Total":["Tirs équipe A","ts_h"],
+      "Shots. Away Total":["Tirs équipe B","ts_a"],
+      "Home Total ShotOnGoal":["Tirs cadrés équipe A","sot_h"],
+      "Home Shots On Target":["Tirs cadrés équipe A","sot_h"],
+      "Away Total ShotOnGoal":["Tirs cadrés équipe B","sot_a"],
+      "Away Shots On Target":["Tirs cadrés équipe B","sot_a"]
+    };
+    var _seenShot={};
     Object.keys(o.markets||{}).forEach(function(mkName){
-      var label=null;
-      if(mkName==="Total Shots")label="Total tirs";
-      else if(mkName==="Total ShotOnGoal")label="Total tirs cadrés";
-      if(!label)return;
+      var def=SHOT_MKTS[mkName]; if(!def)return;
+      var label=def[0], altKey=def[1];
+      if(_seenShot[label])return; _seenShot[label]=1; // evite les doublons de noms de marche
       var mkt=o.markets[mkName]; if(!mkt||!mkt.rows||!mkt.rows.length)return;
       var pe=marketPre(mkName,o.h,o.a,o.date); if(!pe)return;
       var row=oddsRowFor(mkt); if(!row)return;
       var real=realMarket(mkName,m); if(real==null||real<=0)return;
       var side=pe.exp>row.line?"over":"under";
       var edge=Math.abs(pe.exp-row.line);
-      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+row.line,book:mkt.book,odd:side==="over"?row.over:row.under,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga,conf:edge>2?"elevee":(edge>1?"moderee":"faible")});
+      var altE=(alt.sh&&alt.sh[altKey])?alt.sh[altKey][String(row.line)]:null;
+      var pickB=bestOdd(side==="over"?row.over:row.under,mkt.book,altE?altE[side]:null);
+      if(!pickB)return;
+      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+row.line,book:pickB.book,odd:pickB.odd,mini:1.55,won:side==="over"?(real>row.line):(real<row.line),score:m.gf+" - "+m.ga,conf:edge>2?"elevee":(edge>1?"moderee":"faible")});
     });
+    // marches tirs presents UNIQUEMENT chez la source 2 (Winamax/Unibet) : compares a la ligne du modele
+    if(alt.sh){
+      [["ts","Total tirs","Total Shots"],["sot","Total tirs cadrés","Total ShotOnGoal"],
+       ["ts_h","Tirs équipe A","Shots. Home Total"],["ts_a","Tirs équipe B","Shots. Away Total"],
+       ["sot_h","Tirs cadrés équipe A","Home Total ShotOnGoal"],["sot_a","Tirs cadrés équipe B","Away Total ShotOnGoal"]].forEach(function(dd){
+        var key=dd[0],label=dd[1],mkEq=dd[2];
+        if(_seenShot[label]||!alt.sh[key])return;
+        var pe=marketPre(mkEq,o.h,o.a,o.date); if(!pe)return;
+        var real=realMarket(mkEq,m); if(real==null||real<=0)return;
+        // ligne la plus proche de l'attendu du modele
+        var lines=Object.keys(alt.sh[key]).map(Number).filter(function(x){return !isNaN(x);});
+        if(!lines.length)return;
+        var line=lines.reduce(function(p,c){return Math.abs(c-pe.exp)<Math.abs(p-pe.exp)?c:p;});
+        var e2=alt.sh[key][String(line)];
+        var side=pe.exp>line?"over":"under";
+        var pk=e2&&e2[side]; if(!pk||!pk.odd)return;
+        var edge=Math.abs(pe.exp-line);
+        _seenShot[label]=1;
+        out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:label,detail:(side==="over"?"Over ":"Under ")+line,book:(pk.book||"?")+" ²",odd:pk.odd,mini:1.55,won:side==="over"?(real>line):(real<line),score:m.gf+" - "+m.ga,conf:edge>2?"elevee":(edge>1?"moderee":"faible")});
+      });
+    }
     // Over 0,5 but 1re MT (marche "Goals Over/Under First Half", ligne 0.5)
     if(m.htgf!=null&&m.htga!=null){
       var htTot=m.htgf+m.htga, shTot=(m.gf+m.ga)-htTot;

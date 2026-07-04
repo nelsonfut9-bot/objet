@@ -63,6 +63,7 @@ def _f(x):
 def parse_markets(ev):
     """ev = reponse /odds pour UN event : {'bookmakers': {book: [ {name, odds:[{...}]} ]}}"""
     mw_h=[];mw_d=[];mw_a=[];dc_1x=[];dc_x2=[];btts_y=[];btts_n=[];ou={};fh={}
+    sh={"ts":{},"sot":{},"ts_h":{},"ts_a":{},"sot_h":{},"sot_a":{}}
     bks=ev.get("bookmakers") or {}
     if isinstance(bks,list):  # tolerance si liste
         bks={ (b.get("name") or "?"): (b.get("markets") or []) for b in bks if isinstance(b,dict)}
@@ -88,6 +89,20 @@ def parse_markets(ev):
                 for o in rows:
                     if _f(o.get("yes")):btts_y.append((_f(o.get("yes")),bname))
                     if _f(o.get("no")):btts_n.append((_f(o.get("no")),bname))
+            elif "shot" in name:
+                # tirs / tirs cadres : match ou par equipe
+                sot=("target" in name or "on goal" in name or "cadr" in name)
+                side="h" if ("home" in name or "team 1" in name) else ("a" if ("away" in name or "team 2" in name) else "")
+                key=("sot" if sot else "ts")+("_"+side if side else "")
+                tgt=sh.get(key)
+                if tgt is not None:
+                    for o in rows:
+                        ln=_f(o.get("max") if o.get("max") is not None else o.get("hdp") if o.get("hdp") is not None else o.get("line"))
+                        ov=_f(o.get("over")); un=_f(o.get("under"))
+                        if ln is None:continue
+                        e=tgt.setdefault(ln,{})
+                        if ov and ov>((e.get("over") or {}).get("odd") or 0):e["over"]={"odd":ov,"book":bname}
+                        if un and un>((e.get("under") or {}).get("odd") or 0):e["under"]={"odd":un,"book":bname}
             elif "over/under" in name or name=="totals" or name=="totals ht":
                 tgt=fh if is_fh else ou
                 for o in rows:
@@ -103,6 +118,8 @@ def parse_markets(ev):
     if best(btts_y):out["btts"]={"yes":best(btts_y),"no":best(btts_n)}
     if ou:out["ou"]={str(k):v for k,v in ou.items() if v}
     if fh:out["fh"]={str(k):v for k,v in fh.items() if v}
+    for k,d in sh.items():
+        if d: out.setdefault("sh",{})[k]={str(l):v for l,v in d.items() if v}
     return out or None
 
 def run():
@@ -167,6 +184,11 @@ def run():
                 import json as _j
                 print("  DEBUG type payload:",type(payload).__name__,"| nb evs:",len(evs) if isinstance(evs,list) else "?")
                 if isinstance(evs,list) and evs:
+                    allm=set()
+                    for _e in evs:
+                        for _b,_ms in (_e.get("bookmakers") or {}).items():
+                            for _m in _ms or []: allm.add(str(_m.get("name")))
+                    print("  DEBUG marches tirs dispo:",sorted(m for m in allm if "hot" in m.lower()) or "aucun")
                     e0=evs[0]
                     print("  DEBUG keys ev:",list(e0.keys())[:12])
                     bk=e0.get("bookmakers")
