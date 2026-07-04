@@ -38,9 +38,14 @@ def get(path,params):
             _used[0]+=1
             if r.status_code==429:
                 print("  429 odds-api.io -> stop"); return None
-            r.raise_for_status()
+            if r.status_code!=200:
+                body=r.text[:200].replace(chr(10)," ")
+                print(f"  ! {path} -> HTTP {r.status_code}: {body}")
+                if r.status_code in (400,401,402,403,404,422): return None  # inutile de reessayer
+                raise Exception(f"HTTP {r.status_code}")
             return r.json()
         except Exception as e:
+            print(f"  ! {path} tentative {attempt+1}: {e}")
             time.sleep(1.0*(attempt+1))
     return None
 
