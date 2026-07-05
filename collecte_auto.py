@@ -9,6 +9,7 @@ Incremental (progress.json/matches.json), quota-aware. Cle = secret GitHub.
 import json, os, sys, time, math, datetime
 
 API_KEY  = os.environ.get("API_FOOTBALL_KEY", "")
+ODDS_ONLY = ("--odds-only" in sys.argv)  # mode leger (rafraichissement 15 min) : cotes + nouveaux matchs, sans le gros backfill
 BASE_URL = "https://v3.football.api-sports.io"
 OUTPUT   = "donnees_cdm.js"; PROGRESS="progress.json"; MATCHES="matches.json"
 SAFETY_MARGIN=60; MAX_RUN=2000; MAX_PER_TEAM=400; SLEEP=0.10  # MAX_RUN volontairement bas : on sauvegarde souvent (checkpoints)
@@ -368,7 +369,7 @@ def run():
         while pi<len(_p) or oi<len(_o):
             if pi<len(_p): pend.append(_p[pi]); pi+=1
             if oi<len(_o): pend.append(_o[oi]); oi+=1
-        for it in pend:
+        for it in (pend[:25] if ODDS_ONLY else pend):
             if not can_continue(used): raise Stop()
             stats=api_get("/fixtures/statistics",{"fixture":it["fid"]},used)
             per={}
@@ -398,7 +399,7 @@ def run():
             if j<len(club_tasks): fixture_tasks.append(club_tasks[j]); j+=1
             if i<len(nat_tasks): fixture_tasks.append(nat_tasks[i]); i+=1
         now_ts=time.time()
-        for key,params,lid,prio in fixture_tasks:
+        for key,params,lid,prio in ([] if ODDS_ONLY else fixture_tasks):
             season=params.get("season")
             mark=progress["fixtures_done"].get(key)
             if mark:
