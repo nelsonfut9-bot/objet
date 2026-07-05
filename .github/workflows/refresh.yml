@@ -1,8 +1,12 @@
 name: Rafraichissement 15 min
 
 on:
+  # declencheur principal : cron-job.org poste {"event_type":"collecte"} toutes les 15 min (fiable)
+  repository_dispatch:
+    types: [collecte]
+  # filet de securite : planificateur GitHub horaire (si cron-job.org tombe)
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 permissions:
