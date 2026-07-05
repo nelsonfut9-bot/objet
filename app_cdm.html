@@ -1233,6 +1233,8 @@ function realMarket(mkName,m){
   return null;
 }
 function findPlayed(h,a,date){var t=TEAMS[h];if(!t)return null;for(var i=0;i<t.matches.length;i++){var m=t.matches[i];if(m.home&&m.date===date&&m.opp===a)return m;}return null;}
+// force une ligne en X,5 (jamais entiere) : un resultat ne peut pas tomber pile -> plus de remboursement
+function hLine(x){return (x===Math.floor(x))?x+0.5:x;}
 // resultat reel d'un marche pour regler un pari : buts depuis le SCORE (RESULTS), tirs/corners/cartons depuis les stats
 function betReal(fid,o,mkName,played){
   var R=(typeof RESULTS!=="undefined"&&RESULTS)?RESULTS[fid]:null;
@@ -1261,12 +1263,12 @@ function bankrollBets(){
       if(o.open&&o.open[mkName]){var orow=oddsRowAt(o.open[mkName],row.line);if(orow)openOdd=side==="OVER"?orow.over:orow.under;}
       var placed=openOdd||odd;
       var clv=(openOdd&&odd&&openOdd!==odd)?r1((placed/odd-1)*100):(openOdd?0:null);
+      var Lh=hLine(row.line);
       var bet={date:date,dt:(played&&played.dt)||null,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
-        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:placed,oddClose:odd,clv:clv,prob:prob,est:r1(estA),status:"pending"};
+        label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(Lh),side:side,line:Lh,odd:placed,oddClose:odd,clv:clv,prob:prob,est:r1(estA),status:"pending"};
       var real=betReal(fid,o,mkName,played);
       if(real!=null){bet.real=real;
-        if(real===row.line)bet.status="push";
-        else bet.status=((side==="OVER")?(real>row.line):(real<row.line))?"won":"lost";
+        bet.status=((side==="OVER")?(real>Lh):(real<Lh))?"won":"lost"; // ligne en X,5 -> toujours gagne ou perdu, jamais rembourse
       } else if(typeof RESULTS!=="undefined"&&RESULTS&&RESULTS[fid]){
         continue; // match deja joue mais ce marche n'est pas reglable (stat manquante) -> on n'affiche pas ce pari
       }
@@ -1450,6 +1452,7 @@ window.addEventListener("DOMContentLoaded",function(){
   calibrateModel();
   fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
   if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
+  try{fetch("maj.json?_="+Date.now()).then(function(r){return r.ok?r.json():null;}).then(function(j){if(j&&j.ts){var mn=Math.round((Date.now()-new Date(j.ts))/60000);$("dataInfo").innerHTML+=' <span class="muted">· dernière vérif. il y a '+(mn<1?"moins d\'1 min":(mn<60?mn+" min":Math.round(mn/60)+" h"))+'</span>';}}).catch(function(){});}catch(e){}
   $("q").addEventListener("input",renderTeamList);
   $("fcat").addEventListener("change",function(){populateTeamFilters();renderTeamList();});
   $("fcomp").addEventListener("change",function(){populateSeasonOptions();renderTeamList();});

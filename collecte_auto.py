@@ -475,6 +475,8 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
         # scores de TOUS les matchs joues (meme sans stats detaillees) : sert a regler les paris buts/1X2 des que le score tombe
         "var RESULTS = "+json.dumps({fid:{"gh":mm.get("gh"),"ga":mm.get("ga"),"hth":mm.get("hth"),"hta":mm.get("hta")} for fid,mm in matches.items() if mm.get("gh") is not None and mm.get("ga") is not None},ensure_ascii=False)+";\n")
     write_if_changed(OUTPUT,payload,skip_lines=2)  # ignore le commentaire + GENERATED : pas de commit si donnees identiques
+    # battement de coeur : timestamp ecrit a CHAQUE run -> commit visible a chaque passage (l'app affiche "derniere verif.")
+    open("maj.json","w",encoding="utf-8").write(json.dumps({"ts":datetime.datetime.now(datetime.timezone.utc).isoformat()}))
     arch=("// Archive complete (equipes >120 matchs). Chargee a la demande par l'app.\n"
         "var TEAMS_FULL = "+json.dumps(FULL,ensure_ascii=False)+";\n")
     write_if_changed("donnees_archive.js",arch,skip_lines=1)
