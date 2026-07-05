@@ -436,6 +436,9 @@ def rec(opp,comp,season,home,gf,ga,me,opst):
 def aggregate_and_write(matches, upcoming_raw, odds=None):
     byteam={}; comps=set()
     for fid,m in matches.items():
+        H=m.get("H") or {}; A=m.get("A") or {}
+        if not (H.get("ts") or H.get("sot") or H.get("poss") or A.get("ts") or A.get("sot") or A.get("poss")):
+            continue  # match sans statistiques collectees (0 partout) -> exclu : fausse les moyennes
         comps.add(m.get("lname",""))
         r1=rec(m["a"],m["lname"],m["season"],True,m["gh"],m["ga"],m["H"],m["A"]); r1["date"]=m["date"]; r1["dt"]=m.get("dt"); r1["htgf"]=m.get("hth"); r1["htga"]=m.get("hta")
         r2=rec(m["h"],m["lname"],m["season"],False,m["ga"],m["gh"],m["A"],m["H"]); r2["date"]=m["date"]; r2["dt"]=m.get("dt"); r2["htgf"]=m.get("hta"); r2["htga"]=m.get("hth")
