@@ -471,7 +471,9 @@ def aggregate_and_write(matches, upcoming_raw, odds=None):
         "var COMPS = "+json.dumps(comps,ensure_ascii=False)+";\n"
         "var COMP_CAT = "+json.dumps(comp_cat,ensure_ascii=False)+";\n"
         "var TEAMS = "+json.dumps(TEAMS,ensure_ascii=False)+";\n"
-        "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n")
+        "var ODDS = "+json.dumps(odds or {},ensure_ascii=False)+";\n"
+        # scores de TOUS les matchs joues (meme sans stats detaillees) : sert a regler les paris buts/1X2 des que le score tombe
+        "var RESULTS = "+json.dumps({fid:{"gh":mm.get("gh"),"ga":mm.get("ga"),"hth":mm.get("hth"),"hta":mm.get("hta")} for fid,mm in matches.items() if mm.get("gh") is not None and mm.get("ga") is not None},ensure_ascii=False)+";\n")
     write_if_changed(OUTPUT,payload,skip_lines=2)  # ignore le commentaire + GENERATED : pas de commit si donnees identiques
     arch=("// Archive complete (equipes >120 matchs). Chargee a la demande par l'app.\n"
         "var TEAMS_FULL = "+json.dumps(FULL,ensure_ascii=False)+";\n")

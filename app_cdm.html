@@ -1233,6 +1233,13 @@ function realMarket(mkName,m){
   return null;
 }
 function findPlayed(h,a,date){var t=TEAMS[h];if(!t)return null;for(var i=0;i<t.matches.length;i++){var m=t.matches[i];if(m.home&&m.date===date&&m.opp===a)return m;}return null;}
+// resultat reel d'un marche pour regler un pari : buts depuis le SCORE (RESULTS), tirs/corners/cartons depuis les stats
+function betReal(fid,o,mkName,played){
+  var R=(typeof RESULTS!=="undefined"&&RESULTS)?RESULTS[fid]:null;
+  if(mkName==="Goals Over/Under"){if(R&&R.gh!=null&&R.ga!=null)return R.gh+R.ga;return played?realMarket(mkName,played):null;}
+  if(/first half/i.test(mkName)){if(R&&R.hth!=null&&R.hta!=null)return R.hth+R.hta;return played?realMarket(mkName,played):null;}
+  return played?realMarket(mkName,played):null;
+}
 function bankrollBets(){
   if(typeof ODDS==="undefined"||!ODDS)return [];
   var bets=[];
@@ -1256,12 +1263,12 @@ function bankrollBets(){
       var clv=(openOdd&&odd&&openOdd!==odd)?r1((placed/odd-1)*100):(openOdd?0:null);
       var bet={date:date,dt:(played&&played.dt)||null,home:h,away:a,comp:compName,book:mk.book||"",market:mkName,
         label:(MK_LABEL[mkName]||mkName)+" "+side+" "+frn(row.line),side:side,line:row.line,odd:placed,oddClose:odd,clv:clv,prob:prob,est:r1(estA),status:"pending"};
-      if(played){
-        var real=realMarket(mkName,played);
-        if(real!=null){bet.real=real;
-          if(real===row.line)bet.status="push";
-          else bet.status=((side==="OVER")?(real>row.line):(real<row.line))?"won":"lost";
-        }
+      var real=betReal(fid,o,mkName,played);
+      if(real!=null){bet.real=real;
+        if(real===row.line)bet.status="push";
+        else bet.status=((side==="OVER")?(real>row.line):(real<row.line))?"won":"lost";
+      } else if(typeof RESULTS!=="undefined"&&RESULTS&&RESULTS[fid]){
+        continue; // match deja joue mais ce marche n'est pas reglable (stat manquante) -> on n'affiche pas ce pari
       }
       bets.push(bet);
     }
