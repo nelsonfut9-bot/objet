@@ -100,6 +100,7 @@
     <div class="tab active" data-tab="equipes">Équipes</div>
     <div class="tab" data-tab="avenir">Matchs à venir</div>
     <div class="tab" data-tab="picks">Paris du jour</div>
+    <div class="tab" data-tab="combine">Combiné du jour</div>
     <div class="tab" data-tab="value">Value bets</div>
     <div class="tab" data-tab="analyse">Analyse d'un match</div>
     <div class="tab" data-tab="suivi">Suivi & fiabilité</div>
@@ -135,6 +136,17 @@
       <div class="filterbar"><div class="field" style="max-width:280px"><label>Type de pari (filtre)</label><select id="pkType"><option value="all">Tous les types</option></select></div></div>
       <table id="pk"><thead><tr><th>Date</th><th>Match</th><th>Compétition</th><th>Pari</th><th class="num">Réussite hist.</th><th class="num">Cote marché</th><th class="num">Cote mini</th><th class="num">Écart modèle</th></tr></thead><tbody id="pkBody"></tbody></table>
       <p class="small muted" style="margin-top:10px">« Cote mini » inclut une petite marge de sécurité. Les paris secondaires (Over 1,5 but, 80&nbsp;% historique) apparaissent quand le modèle attend au moins 3 buts. Moyennes historiques ≠ garantie : gérer la mise en conséquence.</p>
+    </div>
+  </section>
+
+  <section id="combine" class="hidden">
+    <div class="panel">
+      <div class="secTitle" style="margin-top:0">Combiné du jour — sélections buts les plus sûres</div>
+      <p class="small muted">Pour chaque match à venir, je calcule la probabilité de chaque total de buts (modèle de Poisson) et je monte un combiné avec les sélections les plus sûres. Choisis ton niveau de sécurité : plus c'est prudent, plus la « chance que tout passe » est élevée (mais la cote totale plus basse). Le combiné maximise le nombre de sélections tant que la proba combinée reste au-dessus de ton seuil.</p>
+      <div class="filterbar"><div class="field" style="max-width:320px"><label>Niveau de sécurité</label><select id="cbTarget"><option value="0.7">Prudent — tout passe ≥ 70%</option><option value="0.5" selected>Équilibré — ≥ 50%</option><option value="0.35">Audacieux — ≥ 35%</option></select></div></div>
+      <div class="cards" id="cbCards"></div>
+      <table id="cb"><thead><tr><th></th><th>Date</th><th>Match</th><th>Sélection sûre</th><th class="num">Proba</th><th class="num">Cote</th></tr></thead><tbody id="cbBody"></tbody></table>
+      <p class="small muted" style="margin-top:10px">« ✓ » = sélection retenue dans le combiné (les plus sûres, tant que la proba combinée reste au-dessus du seuil). Les autres sont affichées grisées (hors combiné). Clique une ligne pour analyser le match. Cote « estimée » = pas de cote réelle disponible, j'affiche la cote juste (1 / probabilité).</p>
     </div>
   </section>
 
@@ -680,7 +692,7 @@ function runAnalyse(){
     var od=findOdds(h,a);
     $("result").innerHTML='<div class="secTitle" style="margin-top:0">'+fr(h)+' (domicile) vs '+fr(a)+' (extérieur) — '+(C[ck]?C[ck].l:"")+'</div>'+
       '<div class="est">'+teamCard(Rh,"Domicile")+teamCard(Ra,"Extérieur")+'</div>'+
-      matchTotalsHTML(Rh,Ra)+whichTeamHTML(od,Rh,Ra)+betAdvice(od,Rh,Ra)+oddsHTML(od);
+      matchTotalsHTML(Rh,Ra)+goalLinesHTML(h,a,"2099-12-31")+whichTeamHTML(od,Rh,Ra)+betAdvice(od,Rh,Ra)+oddsHTML(od);
     try{$("result").scrollIntoView({behavior:"smooth",block:"start"});}catch(e2){}
   }catch(e){
     $("result").classList.remove("hidden");
@@ -824,7 +836,7 @@ function ensureArchive(cb){
   document.body.appendChild(s);
 }
 var _reelBuilt=false;
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","combine","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});
   if(name==="reel"&&!_reelBuilt){_reelBuilt=true;var b=$("rlBody");if(b)b.innerHTML='<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Chargement de l\'historique complet…</td></tr>';setTimeout(function(){ensureArchive(buildReel);},30);}
   if(name==="suivi"&&_archState==="none"){ensureArchive(function(){buildBacktest();});}}
 
@@ -1155,6 +1167,70 @@ function buildPicks(){
   document.querySelectorAll("#pk tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
 }
 
+// ====== COMBINE DU JOUR : totaux de buts (loi de Poisson) ======
+function poissonCdf(k,lam){if(lam<=0)return 1;var s=0,t=Math.exp(-lam);for(var i=0;i<=k;i++){s+=t;t=t*lam/(i+1);}return Math.min(1,s);}
+function gOver(line,lam){return 1-poissonCdf(Math.floor(line),lam);}
+function gUnder(line,lam){return poissonCdf(Math.floor(line),lam);}
+function matchLambda(home,away,date){
+  var ph=predKeyAt(home,away,true,date,"gf","ga",1.4,1.12,0.95);
+  var pa=predKeyAt(away,home,false,date,"gf","ga",1.4,1.12,0.95);
+  if(!ph||!pa||ph.n<5||pa.n<5)return null;
+  return ph.exp+pa.exp;
+}
+function goalOdd(o,line,side){
+  if(o){var um=unifyMarkets(o),g=um["Goals Over/Under"];if(g&&g.rows){for(var i=0;i<g.rows.length;i++){if(Math.abs(g.rows[i][0]-line)<0.01)return {odd:(side==="over"?g.rows[i][1]:g.rows[i][2]),book:g.book};}}}
+  return null;
+}
+// tableau des probabilités par ligne + fourchette sûre (detail d'un match)
+function goalLinesHTML(home,away,date){
+  var lam=matchLambda(home,away,date); if(lam==null)return '';
+  var o=findOdds(home,away), lines=[0.5,1.5,2.5,3.5,4.5,5.5];
+  function cell(p,od){var c=p>=0.85?'var(--good)':(p>=0.6?'':'var(--muted)');return '<td class="num" style="color:'+c+'">'+Math.round(p*100)+'%'+(od?' <span class="small muted">@'+frn(od.odd)+'</span>':'')+'</td>';}
+  var rows=lines.map(function(L){return '<tr><td>'+frn(L)+' but'+(L>1?'s':'')+'</td>'+cell(gOver(L,lam),goalOdd(o,L,"over"))+cell(gUnder(L,lam),goalOdd(o,L,"under"))+'</tr>';}).join("");
+  var loOver=null,hiUnder=null;
+  lines.forEach(function(L){if(gOver(L,lam)>=0.9)loOver=L;});
+  lines.slice().reverse().forEach(function(L){if(gUnder(L,lam)>=0.9)hiUnder=L;});
+  var reco='';
+  if(loOver!=null&&hiUnder!=null&&loOver<hiUnder){reco='<div class="reco"><div class="side">Over '+frn(loOver)+' & Under '+frn(hiUnder)+'</div><div class="small muted">fourchette sûre — le match finit quasi sûrement entre '+(Math.floor(loOver)+1)+' et '+Math.floor(hiUnder)+' buts (~'+Math.round(gOver(loOver,lam)*gUnder(hiUnder,lam)*100)+'% combiné)</div></div>';}
+  return '<div class="secTitle">Buts — probabilités par ligne (~'+r1(lam)+' buts attendus)</div><div class="prebox"><div class="small muted" style="margin-bottom:4px">Ma probabilité pour chaque total de buts (modèle de Poisson). Vert = très probable. @ = cote réelle si dispo.</div><table><thead><tr><th>Ligne</th><th class="num">Over</th><th class="num">Under</th></tr></thead><tbody>'+rows+'</tbody></table>'+reco+'</div>';
+}
+// onglet Combiné du jour : accumulateur des sélections buts les plus sûres
+function buildCombine(){
+  var body=$("cbBody"); if(!body)return;
+  var target=$("cbTarget")?parseFloat($("cbTarget").value):0.5;
+  var seen={},list=[];
+  Object.keys(TEAMS).forEach(function(n){(TEAMS[n].upcoming||[]).forEach(function(u){
+    var home=u.home?n:u.opp, away=u.home?u.opp:n, key=u.date+"|"+home+"|"+away;
+    if(seen[key])return; seen[key]=1; list.push({date:u.date,home:home,away:away,comp:u.comp});
+  });});
+  list.sort(function(a,b){return a.date<b.date?-1:1;});
+  var legs=[];
+  list.forEach(function(m){
+    var lam=matchLambda(m.home,m.away,m.date); if(lam==null)return;
+    var o=findOdds(m.home,m.away);
+    var cands=[{lbl:"Over 0,5 but",side:"over",line:0.5,p:gOver(0.5,lam)},
+               {lbl:"Under 5,5 buts",side:"under",line:5.5,p:gUnder(5.5,lam)},
+               {lbl:"Under 4,5 buts",side:"under",line:4.5,p:gUnder(4.5,lam)},
+               {lbl:"Over 1,5 but",side:"over",line:1.5,p:gOver(1.5,lam)}];
+    cands.sort(function(a,b){return b.p-a.p;});
+    var best=cands[0]; if(best.p<0.8)return;
+    var od=goalOdd(o,best.line,best.side), odd=od?od.odd:Math.max(1.01,r2(1/best.p));
+    legs.push({date:m.date,home:m.home,away:m.away,comp:m.comp,lbl:best.lbl,p:best.p,odd:odd,real:!!od,book:od?od.book:"cote estimée"});
+  });
+  legs.sort(function(a,b){return b.p-a.p;});
+  var combP=1,totOdd=1;
+  legs.forEach(function(l){l.inCombo=(combP*l.p>=target);if(l.inCombo){combP*=l.p;totOdd*=l.odd;}});
+  var nCombo=legs.filter(function(l){return l.inCombo;}).length;
+  $("cbCards").innerHTML=
+    '<div class="card g"><div class="v">'+nCombo+'</div><div class="k">Sélections dans le combiné</div></div>'+
+    '<div class="card g"><div class="v">'+frn(r2(totOdd))+'</div><div class="k">Cote totale</div></div>'+
+    '<div class="card'+(combP>=0.5?' g':'')+'"><div class="v">'+Math.round(combP*100)+'%</div><div class="k">Chance que TOUT passe</div></div>'+
+    '<div class="card"><div class="v">'+(nCombo?((combP*totOdd-1>=0?'+':'')+Math.round((combP*totOdd-1)*100)+'%'):'—')+'</div><div class="k">Valeur (EV)</div></div>';
+  body.innerHTML=legs.map(function(l){
+    return '<tr class="click" data-h="'+esc(l.home)+'" data-a="'+esc(l.away)+'" style="'+(l.inCombo?'':'opacity:.5')+'"><td>'+(l.inCombo?'<span class="pill W">✓</span>':'')+'</td><td class="small muted">'+dm(l.date)+'</td><td>'+fr(l.home)+' <span class="muted">vs</span> '+fr(l.away)+'</td><td>'+l.lbl+'</td><td class="num">'+Math.round(l.p*100)+'%</td><td class="num"><b>'+frn(l.odd)+'</b> <span class="small muted">'+(l.real?esc(l.book||''):'estimée')+'</span></td></tr>';
+  }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Pas encore de matchs à venir avec assez d\'historique.</td></tr>';
+  document.querySelectorAll("#cb tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
+}
 // ---- bankroll (mise fixe, vraies cotes uniquement) ----
 var STAKE=200;
 var MK_LABEL={"Total Shots":"Total tirs (match)","Total ShotOnGoal":"Total tirs cadrés (match)","Shots. Home Total":"Tirs domicile","Shots. Away Total":"Tirs extérieur","Home Total ShotOnGoal":"Tirs cadrés domicile","Away Total ShotOnGoal":"Tirs cadrés extérieur","Home Shots On Target":"Tirs cadrés domicile","Away Shots On Target":"Tirs cadrés extérieur","Goals Over/Under":"Total buts (match)","Corners Over Under":"Total corners (match)","Total Corners":"Total corners (match)","Total - Corners":"Total corners (match)","Cards Over/Under":"Total cartons (match)","Total Cards":"Total cartons (match)","Total - Cards":"Total cartons (match)"};
@@ -1450,7 +1526,7 @@ window.addEventListener("DOMContentLoaded",function(){
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
   calibrateModel();
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildCombine(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
   if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
   try{fetch("maj.json?_="+Date.now()).then(function(r){return r.ok?r.json():null;}).then(function(j){if(j&&j.ts){var mn=Math.round((Date.now()-new Date(j.ts))/60000);$("dataInfo").innerHTML+=' <span class="muted">· dernière vérif. il y a '+(mn<1?"moins d\'1 min":(mn<60?mn+" min":Math.round(mn/60)+" h"))+'</span>';}}).catch(function(){});}catch(e){}
   $("q").addEventListener("input",renderTeamList);
@@ -1465,6 +1541,7 @@ window.addEventListener("DOMContentLoaded",function(){
   $("vbScope").addEventListener("change",buildValueBets);
   if($("pkType"))$("pkType").addEventListener("change",buildPicks);
   if($("vbType"))$("vbType").addEventListener("change",buildValueBets);
+  if($("cbTarget"))$("cbTarget").addEventListener("change",buildCombine);
   ["rlType","rlMin","rlConf","rlTeam","rlComp","rlSeason","rlFrom","rlTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildReel);});
   if($("rlReset"))$("rlReset").addEventListener("click",function(){["rlType","rlTeam","rlComp","rlSeason","rlConf"].forEach(function(id){if($(id))$(id).value="all";});$("rlMin").value="0";$("rlFrom").value="";$("rlTo").value="";buildReel();});
   document.querySelectorAll(".tabs .tab").forEach(function(t){t.addEventListener("click",function(){if(t.dataset.tab)selectTab(t.dataset.tab);});});
