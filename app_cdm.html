@@ -215,6 +215,10 @@
         <div class="field" style="max-width:120px;display:flex;align-items:flex-end"><button class="tab" id="rlReset" style="width:100%">↺ Tout</button></div>
       </div>
       <div class="cards" id="rlCards"></div>
+      <div class="secTitle">🎯 Paris à venir à prendre</div>
+      <p class="small muted">Les paris recommandés sur les matchs à <b>venir</b>, avec leur cote réelle (meilleur prix API-Football + Winamax/Unibet). Ce sont les <b>mêmes types de paris</b> que l'historique ci-dessous : regarde leur taux de réussite dans les cartes, puis prends les meilleurs. Filtre par « Type de pari » et « Confiance ». Clique une ligne pour analyser le match.</p>
+      <table id="rlUp"><thead><tr><th>Date</th><th>Match</th><th>Compétition</th><th>Pari</th><th class="num">Confiance</th><th class="num">Cote</th></tr></thead><tbody id="rlUpBody"></tbody></table>
+      <div class="secTitle" style="margin-top:20px">📊 Historique — paris réglés (résultats réels)</div>
       <table id="rl"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Book</th><th class="num">Cote réelle</th><th class="num">Mini</th><th>Statut</th><th class="num">Score</th><th>Résultat</th><th class="num">Gain</th></tr></thead><tbody id="rlBody"></tbody></table>
     </div>
   </section>
@@ -991,10 +995,37 @@ function fillReelFilters(rows){
     elT.value=curT; if(elT.value!==curT)elT.value="all";}
   fill("rlTeam",teams,"Toutes"); fill("rlComp",comps,"Tous"); fill("rlSeason",seasons,"Toutes");
 }
+// paris recommandés sur les matchs À VENIR (mêmes types que le suivi réel) avec cote réelle
+function _reelUpcoming(){
+  if(typeof TEAMS==="undefined")return [];
+  var out=[],seen={};
+  Object.keys(TEAMS).forEach(function(n){(TEAMS[n].upcoming||[]).forEach(function(u){
+    var home=u.home?n:u.opp, away=u.home?u.opp:n, key=u.date+"|"+home+"|"+away;
+    if(seen[key])return; seen[key]=1;
+    var o=findOdds(home,away), wh=(o&&o.which)||{}, alt=(o&&o.alt)||{};
+    (pickRulesFor(home,away,u.date)||[]).forEach(function(p){
+      var pk=null;
+      if(p.code==="1X")pk=bestOdd(wh.dc&&wh.dc["1X"],wh.dc&&wh.dc.book,alt.dc&&alt.dc["1X"]);
+      else if(p.code==="X2")pk=bestOdd(wh.dc&&wh.dc["X2"],wh.dc&&wh.dc.book,alt.dc&&alt.dc["X2"]);
+      else if(p.code==="V1")pk=bestOdd(wh.mw&&wh.mw.home,wh.mw&&wh.mw.book,alt.mw&&alt.mw.home);
+      else if(p.code==="O15"){var g=o?unifyMarkets(o)["Goals Over/Under"]:null;if(g&&g.rows)g.rows.forEach(function(x){if(Math.abs(x[0]-1.5)<0.01)pk={odd:x[1],book:g.book};});}
+      out.push({date:u.date,h:home,a:away,comp:u.comp||"",label:p.label,book:pk?pk.book:"—",odd:pk?pk.odd:null,mini:p.odd,conf:p.conf||"moderee",isPick:true});
+    });
+    var lam=matchLambda(home,away,u.date);
+    if(lam!=null){
+      [["Over 0,5 but",gOver(0.5,lam),0.5,"over"],["Under 4,5 buts",gUnder(4.5,lam),4.5,"under"]].forEach(function(g){
+        if(g[1]<0.85)return; var od=goalOdd(o,g[2],g[3]);
+        out.push({date:u.date,h:home,a:away,comp:u.comp||"",label:g[0],book:od?od.book:"cote estimée",odd:od?od.odd:r2(1/g[1]),mini:1.01,conf:g[1]>=0.93?"elevee":"moderee",isPick:false});
+      });
+    }
+  });});
+  out.sort(function(a,b){return a.date<b.date?-1:1;});
+  return out;
+}
 function buildReel(){
   var body=$("rlBody"); if(!body)return;
-  var all=_reelRows();
-  fillReelFilters(all);
+  var all=_reelRows(), upAll=_reelUpcoming();
+  fillReelFilters(all.concat(upAll));
   var fT=$("rlType").value,fE=$("rlTeam").value,fC=$("rlComp").value,fS=$("rlSeason").value,fFrom=$("rlFrom").value,fTo=$("rlTo").value,fCf=$("rlConf")?$("rlConf").value:"all";
   var rows=all.filter(function(r){
     if(fT==="__picks"){if(!r.isPick)return false;}
@@ -1029,12 +1060,31 @@ function buildReel(){
   cards+='<div class="card g"><div class="v">'+(nTaken?Math.round(nWon/nTaken*100)+"%":"—")+'</div><div class="k">Réussite des paris pris ('+nWon+'/'+nTaken+')</div></div>';
   var roiG=nTaken?Math.round(pnl/(nTaken*STAKE)*100):0;
   cards+='<div class="card'+(roiG>=0?' g':'')+'"><div class="v" style="color:'+(roiG>=0?'var(--good)':'var(--bad)')+'">'+(roiG>=0?'+':'')+roiG+'%</div><div class="k">ROI (gain net / total misé)</div></div>';
+  cards+='<div class="card"><div class="v">'+nTaken+'</div><div class="k">Paris réglés (pris)</div></div>';
+  cards+='<div class="card"><div class="v">'+(nTaken*STAKE)+' €</div><div class="k">Total misé</div></div>';
   Object.keys(stats).forEach(function(k){
     var s=stats[k],roi=Math.round(s.pnl/(s.n*STAKE)*100);
     cards+='<div class="card g"><div class="v">'+Math.round(s.ok/s.n*100)+'%</div><div class="k">'+k+' — '+s.n+' pris · '+(s.pnl>=0?'+':'')+s.pnl+' · ROI '+(roi>=0?'+':'')+roi+'%</div></div>';
   });
   cards+='<div class="card"><div class="v">'+nSkip+'</div><div class="k">Écartés par le filtre cote mini</div></div>';
   $("rlCards").innerHTML=cards;
+  // ---- Paris à venir à prendre (mêmes types, mêmes filtres) ----
+  var ub=$("rlUpBody");
+  if(ub){
+    var up=upAll.filter(function(r){
+      if(fT==="__picks"){if(!r.isPick)return false;}
+      else if(fT&&fT!=="all"&&r.label!==fT)return false;
+      if(fE&&fE!=="all"&&r.h!==fE&&r.a!==fE)return false;
+      if(fC&&fC!=="all"&&r.comp!==fC)return false;
+      if(fCf!=="all"&&(r.conf||"moderee")!==fCf)return false;
+      return true;
+    });
+    ub.innerHTML=up.slice(0,120).map(function(r){
+      var cf=r.conf==="elevee"?'<span class="pill W">élevée</span>':(r.conf==="faible"?'<span class="pill" style="background:#5b6b7d;color:#fff">faible</span>':'<span class="pill D">modérée</span>');
+      return '<tr class="click" data-h="'+esc(r.h)+'" data-a="'+esc(r.a)+'"><td class="small muted">'+dm(r.date)+'</td><td>'+fr(r.h)+' <span class="muted">vs</span> '+fr(r.a)+'</td><td class="compTag">'+esc(r.comp)+'</td><td>'+r.label+'</td><td class="num">'+cf+'</td><td class="num">'+(r.odd?'<b>'+frn(r.odd)+'</b> <span class="small muted">'+esc(r.book||"")+'</span>':'<span class="muted">—</span>')+'</td></tr>';
+    }).join("")||'<tr><td colspan="6" class="muted" style="text-align:center;padding:14px">Aucun pari à venir pour ce filtre (la liste se remplit avec les matchs à venir et leurs cotes captées).</td></tr>';
+    document.querySelectorAll("#rlUp tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
+  }
 }
 // ---- Suivi : backtest des Paris du jour (memes regles, zero lookahead) ----
 var _prMemo={};
