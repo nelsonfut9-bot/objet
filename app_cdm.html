@@ -101,6 +101,7 @@
     <div class="tab" data-tab="avenir">Matchs à venir</div>
     <div class="tab" data-tab="picks">Paris du jour</div>
     <div class="tab" data-tab="combine">Combiné du jour</div>
+    <div class="tab" data-tab="best">Meilleurs paris</div>
     <div class="tab" data-tab="value">Value bets</div>
     <div class="tab" data-tab="analyse">Analyse d'un match</div>
     <div class="tab" data-tab="suivi">Suivi & fiabilité</div>
@@ -160,6 +161,15 @@
         <div class="field" style="display:flex;align-items:flex-end"><span class="small muted" id="vbCount"></span></div>
       </div>
       <table id="vb"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Book</th><th class="num">Cote</th><th class="num">Ma proba</th><th class="num">Marché</th><th class="num">Edge</th><th class="num">EV</th></tr></thead><tbody id="vbBody"></tbody></table>
+    </div>
+  </section>
+
+  <section id="best" class="hidden">
+    <div class="panel">
+      <div class="secTitle" style="margin-top:0">Meilleurs paris du jour — valeur + types rentables</div>
+      <p class="small muted">Les paris à <b>valeur positive</b> (ma probabilité &gt; probabilité du marché) sur les matchs à venir, <b>classés par EV</b> (espérance de gain). La colonne « ROI historique » indique si ce type de value bet a <b>réellement rapporté</b> par le passé (mesuré dans le Suivi réel). Coche « types rentables uniquement » pour ne garder que ceux qui ont gagné historiquement — c'est le chemin le plus solide vers un ROI durable. Clique une ligne pour analyser le match.</p>
+      <div class="filterbar"><div class="field" style="max-width:340px"><label>Filtre</label><select id="bpProf"><option value="0">Tous les paris à valeur</option><option value="1">Types rentables au backtest uniquement</option></select></div><div class="field" style="display:flex;align-items:flex-end"><span class="small muted" id="bpCount"></span></div></div>
+      <table id="bp"><thead><tr><th>Date</th><th>Match</th><th>Pari</th><th>Book</th><th class="num">Cote</th><th class="num">Ma proba</th><th class="num">EV</th><th class="num">ROI historique</th></tr></thead><tbody id="bpBody"></tbody></table>
     </div>
   </section>
 
@@ -845,7 +855,7 @@ function ensureArchive(cb){
   document.body.appendChild(s);
 }
 var _reelBuilt=false;
-function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","combine","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});
+function selectTab(name){document.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("active",t.dataset.tab===name);});["equipes","avenir","picks","combine","best","value","analyse","suivi","reel","bankroll"].forEach(function(id){$(id).classList.toggle("hidden",id!==name);});
   if(name==="reel"&&!_reelBuilt){_reelBuilt=true;var b=$("rlBody");if(b)b.innerHTML='<tr><td colspan="10" class="muted" style="text-align:center;padding:18px">Chargement de l\'historique complet…</td></tr>';setTimeout(function(){ensureArchive(buildReel);},30);}
   if(name==="suivi"&&_archState==="none"){ensureArchive(function(){buildBacktest();});}}
 
@@ -966,6 +976,19 @@ function _reelRows(){
         out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:gp[0],book:_od?_od.book:"cote estimée",odd:_od?_od.odd:Math.max(1.01,r2(1/gp[1])),mini:1.01,won:(gp[3]==="over"?(_tg>gp[2]):(_tg<gp[2])),score:m.gf+" - "+m.ga,conf:gp[1]>=0.93?"elevee":"moderee"});
       });
     }
+    // VALUE BETS historiques (EV+ au moment du match, zéro lookahead) : pour mesurer si le value betting rapporte
+    var _um=unifyMarkets(o);
+    for(var _vmk in _um){
+      var _vm=_um[_vmk], _vr=oddsRowFor(_vm); if(!_vr)continue;
+      var _vpe=marketPre(_vmk,o.h,o.a,o.date); if(!_vpe)continue;
+      var _va=(_vm.bl!=null)?_vm.bl:_vr.line, _ve=0.5*_vpe.exp+0.5*_va;
+      var _vpo=1-normCdf(_vr.line,_ve,_vpe.sd), _vs=_vpo>=0.5?"over":"under", _vp=_vs==="over"?_vpo:1-_vpo;
+      var _vo=_vs==="over"?_vr.over:_vr.under; if(!_vo||_vo<1.01)continue;
+      var _vev=_vp*_vo-1; if(_vev<=0.03)continue;
+      var _vreal=realMarket(_vmk,m); if(_vreal==null)continue;
+      var _vLh=hLine(_vr.line), _vwon=(_vs==="over")?(_vreal>_vLh):(_vreal<_vLh);
+      out.push({date:o.date,h:o.h,a:o.a,comp:m.comp||"",season:m.season||"",label:"Value : "+(MK_LABEL[_vmk]||_vmk)+" "+(_vs==="over"?"Over":"Under")+" "+frn(_vLh),detail:"EV +"+Math.round(_vev*100)+"%",book:_vm.book||"",odd:_vo,mini:1.01,won:_vwon,score:m.gf+" - "+m.ga,conf:_vev>0.10?"elevee":"moderee",isValue:true,market:_vmk});
+    }
   });
   // cotes historiques reelles (football-data.co.uk) : buts / 1X2 / double chance derivee
   if(typeof HISTO!=="undefined"&&HISTO&&HISTO.length){
@@ -1006,7 +1029,7 @@ function fillReelFilters(rows){
     el.value=cur; if(el.value!==cur)el.value="all";}
   var elT=$("rlType");
   if(elT){var curT=elT.value||"all";
-    elT.innerHTML='<option value="all">Tous</option><option value="__picks">Paris du jour (groupés)</option>'+Object.keys(types).sort().map(function(k){return '<option value="'+esc(k)+'">'+k+'</option>';}).join("");
+    elT.innerHTML='<option value="all">Tous</option><option value="__picks">Paris du jour (groupés)</option><option value="__value">Value bets (groupés)</option>'+Object.keys(types).filter(function(k){return k.indexOf("Value :")!==0;}).sort().map(function(k){return '<option value="'+esc(k)+'">'+k+'</option>';}).join("");
     elT.value=curT; if(elT.value!==curT)elT.value="all";}
   fill("rlTeam",teams,"Toutes"); fill("rlComp",comps,"Tous"); fill("rlSeason",seasons,"Toutes");
 }
@@ -1044,7 +1067,9 @@ function buildReel(){
   var fT=$("rlType").value,fE=$("rlTeam").value,fC=$("rlComp").value,fS=$("rlSeason").value,fFrom=$("rlFrom").value,fTo=$("rlTo").value,fCf=$("rlConf")?$("rlConf").value:"all";
   var rows=all.filter(function(r){
     if(fT==="__picks"){if(!r.isPick)return false;}
-    else if(fT&&fT!=="all"&&r.label!==fT)return false;
+    else if(fT==="__value"){if(!r.isValue)return false;}
+    else if(fT&&fT!=="all"){if(r.label!==fT)return false;}
+    else if(r.isValue)return false;
     if(fE&&fE!=="all"&&r.h!==fE&&r.a!==fE)return false;
     if(fC&&fC!=="all"&&r.comp!==fC)return false;
     if(fS&&fS!=="all"&&String(r.season)!==String(fS))return false;
@@ -1553,6 +1578,28 @@ function buildValueBets(){
   var pos=rows.filter(function(b){return b.ev>0;}).length;
   $("vbCount").textContent=rows.length+" paris analysés"+(pos?(" · "+pos+" à valeur positive"):"");
 }
+// ROI historique des VALUE BETS par marché (depuis le Suivi réel) -> pour prioriser les types rentables
+function valueTypeStats(){
+  var m={}; _reelRows().forEach(function(r){if(!r.isValue||!r.market)return;var s=m[r.market]||(m[r.market]={n:0,ok:0,pnl:0});s.n++;if(r.won){s.ok++;s.pnl+=Math.round((r.odd-1)*STAKE);}else s.pnl-=STAKE;});
+  Object.keys(m).forEach(function(k){var s=m[k];s.roi=s.n?Math.round(s.pnl/(s.n*STAKE)*100):0;s.hit=s.n?Math.round(s.ok/s.n*100):0;});
+  return m;
+}
+// onglet Meilleurs paris du jour : value bets à venir, classés par EV, avec le ROI historique du type
+function buildBest(){
+  var body=$("bpBody"); if(!body)return;
+  var onlyProf=$("bpProf")&&$("bpProf").value==="1";
+  var stats=valueTypeStats();
+  var rows=valueBets().filter(function(b){return b.ev>0;}).map(function(b){var st=stats[b.market];b._roi=st?st.roi:null;b._n=st?st.n:0;return b;});
+  if(onlyProf)rows=rows.filter(function(b){return b._roi!=null&&b._roi>0&&b._n>=10;});
+  rows.sort(function(a,b){return b.ev-a.ev;});
+  var pos=rows.length;
+  body.innerHTML=rows.slice(0,150).map(function(b){
+    var histo=(b._roi==null)?'<span class="muted small">jamais testé</span>':('<b style="color:'+(b._roi>=0?'var(--good)':'var(--bad)')+'">'+(b._roi>=0?'+':'')+b._roi+'%</b> <span class="small muted">('+b._n+')</span>');
+    return '<tr class="click" data-h="'+esc(b.home)+'" data-a="'+esc(b.away)+'"><td class="small muted">'+dm(b.date)+timeTag(b.dt)+'</td><td>'+fr(b.home)+' <span class="muted">–</span> '+fr(b.away)+'</td><td class="small">'+b.label+'</td><td class="small muted">'+b.book+'</td><td class="num"><b>'+frn(b.odd)+'</b></td><td class="num">'+b.myP+'%</td><td class="num" style="color:'+(b.ev>=0?'var(--good)':'var(--muted)')+'">'+(b.ev>=0?'+':'')+frn(b.ev)+'%</td><td class="num">'+histo+'</td></tr>';
+  }).join("")||'<tr><td colspan="8" class="muted" style="text-align:center;padding:18px">Aucun pari à valeur pour l\'instant (il faut des cotes de matchs à venir).</td></tr>';
+  if($("bpCount"))$("bpCount").textContent=pos+" paris à valeur"+(onlyProf?" · types rentables":"");
+  document.querySelectorAll("#bp tr.click").forEach(function(tr){tr.addEventListener("click",function(){loadMatch(tr.dataset.h,tr.dataset.a);});});
+}
 function buildCalibration(){
   var buckets={};
   function add(rc,real){if(!rc||real==null)return;var p=rc.prob/100,hit=((real>rc.line)===(rc.side==="over"))?1:0,bk=Math.min(9,Math.floor(p*10));buckets[bk]=buckets[bk]||{n:0,h:0,ps:0};buckets[bk].n++;buckets[bk].h+=hit;buckets[bk].ps+=p;}
@@ -1597,7 +1644,7 @@ window.addEventListener("DOMContentLoaded",function(){
   var nb=Object.keys(TEAMS).length, nm=Object.keys(TEAMS).reduce(function(s,n){return s+TEAMS[n].matches.length;},0);
   $("dataInfo").innerHTML="Base : <b>"+nb+" équipes</b>, "+nm+" matchs avec stats détaillées, "+(COMPS?COMPS.length:0)+" compétitions.";
   calibrateModel();
-  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildCombine(); buildBacktest(); buildBankroll(); buildValueBets(); buildCalibration();
+  fillFilters(); fillTeamSelects(); renderTeamList(); buildUpcoming(); buildPicks(); buildCombine(); buildBacktest(); buildBankroll(); buildValueBets(); buildBest(); buildCalibration();
   if(typeof GENERATED!=="undefined"&&GENERATED){try{var ageMin=Math.round((Date.now()-new Date(GENERATED))/60000);var ageTxt=ageMin<60?(ageMin+" min"):(Math.round(ageMin/60)+" h");$("dataInfo").innerHTML+=' <span class="muted">· données mises à jour il y a '+ageTxt+'</span>';}catch(e){}}
   try{fetch("maj.json?_="+Date.now()).then(function(r){return r.ok?r.json():null;}).then(function(j){if(j&&j.ts){var mn=Math.round((Date.now()-new Date(j.ts))/60000);$("dataInfo").innerHTML+=' <span class="muted">· dernière vérif. il y a '+(mn<1?"moins d\'1 min":(mn<60?mn+" min":Math.round(mn/60)+" h"))+'</span>';}}).catch(function(){});}catch(e){}
   $("q").addEventListener("input",renderTeamList);
@@ -1613,6 +1660,7 @@ window.addEventListener("DOMContentLoaded",function(){
   if($("pkType"))$("pkType").addEventListener("change",buildPicks);
   if($("vbType"))$("vbType").addEventListener("change",buildValueBets);
   if($("cbTarget"))$("cbTarget").addEventListener("change",buildCombine);
+  if($("bpProf"))$("bpProf").addEventListener("change",buildBest);
   ["rlType","rlMin","rlConf","rlTeam","rlComp","rlSeason","rlFrom","rlTo"].forEach(function(id){if($(id))$(id).addEventListener("change",buildReel);});
   if($("rlReset"))$("rlReset").addEventListener("click",function(){["rlType","rlTeam","rlComp","rlSeason","rlConf"].forEach(function(id){if($(id))$(id).value="all";});$("rlMin").value="0";$("rlFrom").value="";$("rlTo").value="";buildReel();});
   document.querySelectorAll(".tabs .tab").forEach(function(t){t.addEventListener("click",function(){if(t.dataset.tab)selectTab(t.dataset.tab);});});
