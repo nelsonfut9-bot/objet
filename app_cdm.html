@@ -441,6 +441,23 @@ function statBar(lab,lv,rv,dec){
   return '<div class="srow"><span>'+lt+'</span><span class="lab">'+lab+'</span><span>'+rt+'</span></div>'+
     '<div class="cbar"><i class="l" style="width:'+lp+'%"></i><i class="r" style="width:'+rp+'%"></i></div>';
 }
+// ---- terrain neutre : Coupe du Monde, Euro, Copa America, Ligue des Nations -> aucun avantage domicile ----
+function isNeutralComp(c){
+  if(!c)return false; var s=(""+c).toLowerCase();
+  if(/europa|conference|champions/.test(s))return false;
+  return /world cup|coupe du monde|copa america|nations league|ligue des nations|\beuro\b/.test(s);
+}
+var _neutMemo={};
+function matchIsNeutral(name,opp,date){
+  var k=name+"|"+opp+"|"+date;
+  if(_neutMemo[k]!==undefined)return _neutMemo[k];
+  var c=null, t=TEAMS[name];
+  if(t){
+    (t.upcoming||[]).forEach(function(u){if(c==null&&u.opp===opp&&u.date===date)c=u.comp;});
+    if(c==null)t.matches.forEach(function(m){if(c==null&&m.opp===opp&&m.date===date)c=m.comp;});
+  }
+  var res=isNeutralComp(c); _neutMemo[k]=res; return res;
+}
 // prediction d'avant-match : utilise UNIQUEMENT les matchs joues AVANT cette date (zero lookahead)
 function predictAt(name,opp,isHome,date){
   var t=TEAMS[name], o=TEAMS[opp];
@@ -452,7 +469,7 @@ function predictAt(name,opp,isHome,date){
   var opast=o?o.matches.filter(function(m){return m.date<date;}):[];
   var oc=opast.length?mean(opast.map(function(m){return m.a_ts;})):LEAGUE_AVG;
   var defF=oc/LEAGUE_AVG;
-  var exp=attack*(0.5+0.5*defF)*(isHome?1.12:0.96);
+  var exp=attack*(0.5+0.5*defF)*(matchIsNeutral(name,opp,date)?1.0:(isHome?1.12:0.96));
   var sd=Math.max(std(sf),1.7);
   var sotRatio=mean(sf)?mean(sot)/mean(sf):0.35;
   var expSot=exp*sotRatio*(0.96+0.08*defF);
@@ -553,7 +570,8 @@ function predict(name,opp,isHome,compKey){
   var xgf=ms.map(function(m){return m.xg;}).filter(function(x){return x!=null;});
   var form5=mean(sf.slice(0,5)), form10=mean(sf.slice(0,10)), attack=0.6*form5+0.4*form10;
   var oc=mean(oppCd)||LEAGUE_AVG, defF=oc/LEAGUE_AVG;
-  var exp=attack*(0.5+0.5*defF)*(isHome?1.12:0.96)*(C[compKey]?C[compKey].m:1.0);
+  var _neut=!!(C[compKey]&&C[compKey].l&&isNeutralComp(C[compKey].l));
+  var exp=attack*(0.5+0.5*defF)*(_neut?1.0:(isHome?1.12:0.96))*(C[compKey]?C[compKey].m:1.0);
   var sd=Math.max(std(sf),1.7);
   var sotRatio=mean(sf)?mean(sot)/mean(sf):0.35;
   var expSot=exp*sotRatio*(0.96+0.08*defF);
@@ -1341,7 +1359,8 @@ function predKeyAt(name,opp,isHome,date,key,oppKey,lg,homeB,minSd){
   var vals=past.map(function(m){return m[key];});
   var base=0.6*mean(vals.slice(0,5))+0.4*mean(vals.slice(0,10)), defF=1;
   if(oppKey&&lg&&TEAMS[opp]){var op=TEAMS[opp].matches.filter(function(m){return m.date<date&&m[oppKey]!=null;});if(op.length){defF=mean(op.map(function(m){return m[oppKey];}))/lg;}}
-  return {exp:base*(0.6+0.4*defF)*(isHome?homeB:(2-homeB)),sd:Math.max(std(vals),minSd),n:past.length};
+  var _hf=matchIsNeutral(name,opp,date)?1.0:(isHome?homeB:(2-homeB));
+  return {exp:base*(0.6+0.4*defF)*_hf,sd:Math.max(std(vals),minSd),n:past.length};
 }
 function _comb(h,a){return (h&&a)?{exp:h.exp+a.exp,sd:Math.sqrt(h.sd*h.sd+a.sd*a.sd)}:null;}
 // ---- calibration pilotée par les données : l'incertitude = erreur réelle passée du modèle ----
